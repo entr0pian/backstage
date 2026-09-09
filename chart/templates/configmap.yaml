@@ -6,14 +6,23 @@ metadata:
     app: {{ .Chart.Name }}
 data:
   # Layered on top of app-config.yaml + app-config.production.yaml (see
-  # deployment.yaml's args). Two jobs:
+  # deployment.yaml's args). Three jobs:
   #   1. Cancel app-config.production.yaml's `database.client: pg` — we
   #      haven't wired up Postgres yet (see backstage/README.md), so this
   #      keeps the in-memory sqlite default instead of crashing on missing
   #      POSTGRES_* env vars.
   #   2. When Values.baseUrl is set, override the localhost defaults so the
   #      app/backend/CORS URLs are actually reachable through the Ingress.
+  #   3. Allow the guest auth provider outside a dev environment — Backstage
+  #      refuses it by default whenever NODE_ENV=production (which the
+  #      Dockerfile always sets), and this milestone has no real IdP wired
+  #      up yet, so guest auth with an explicit opt-in is the correct
+  #      tradeoff for now rather than a misconfiguration to work around.
   app-config.cluster.yaml: |
+    auth:
+      providers:
+        guest:
+          dangerouslyAllowOutsideDevelopment: true
     backend:
       database:
         client: better-sqlite3
