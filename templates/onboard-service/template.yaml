@@ -1,0 +1,100 @@
+apiVersion: scaffolder.backstage.io/v1beta3
+kind: Template
+metadata:
+  name: onboard-service
+  title: Onboard Service
+  description: >-
+    Onboard a new platform component by opening a pull request against
+    application-repositories with a Component CR. Backstage does not create
+    any Kubernetes resources directly — component-operator picks up the
+    Component once this PR is merged, and the existing GitOps flow takes it
+    from there.
+spec:
+  owner: user:guest
+  type: service
+
+  parameters:
+    - title: Service details
+      required:
+        - name
+        - owner
+      properties:
+        name:
+          title: Service name
+          type: string
+          description: >-
+            Lowercase DNS-style name (e.g. order-service). Used as the
+            Kubernetes resource name, the GitHub repository name, and the
+            platform component name.
+          pattern: '^[a-z0-9]([-a-z0-9]*[a-z0-9])?$'
+          maxLength: 63
+          ui:autofocus: true
+        owner:
+          title: Owner
+          type: string
+          description: Team responsible for this component.
+        visibility:
+          title: Repository visibility
+          type: string
+          description: >-
+            Visibility of the GitHub repository component-operator will
+            create for this component.
+          enum:
+            - public
+            - private
+            - internal
+          default: public
+        scaffoldTemplate:
+          title: Scaffold template
+          type: string
+          description: platform-scaffolds template used to seed the new repository.
+          enum:
+            - golang-service
+          default: golang-service
+        scaffoldVersion:
+          title: Scaffold version
+          type: string
+          description: >-
+            SemVer tag of the platform-scaffolds template, without a
+            leading "v".
+          default: '0.3.0'
+
+  steps:
+    - id: render-component
+      name: Render Component manifest
+      action: fetch:template
+      input:
+        url: ./skeleton
+        targetPath: platform/registry
+        values:
+          name: ${{ parameters.name }}
+          owner: ${{ parameters.owner }}
+          visibility: ${{ parameters.visibility }}
+          scaffoldTemplate: ${{ parameters.scaffoldTemplate }}
+          scaffoldVersion: ${{ parameters.scaffoldVersion }}
+
+    - id: open-pr
+      name: Open pull request
+      action: publish:github:pull-request
+      input:
+        repoUrl: github.com?repo=application-repositories&owner=entr0pian
+        branchName: backstage/onboard-${{ parameters.name }}
+        title: 'Onboard component: ${{ parameters.name }}'
+        description: |-
+          Onboards `${{ parameters.name }}` as a new platform Component via Backstage.
+
+          | Field | Value |
+          |---|---|
+          | Component | `${{ parameters.name }}` |
+          | Owner | `${{ parameters.owner }}` |
+          | Repository visibility | `${{ parameters.visibility }}` |
+          | Scaffold template | `${{ parameters.scaffoldTemplate }}` |
+          | Scaffold version | `${{ parameters.scaffoldVersion }}` |
+
+          Generated through Backstage's **Onboard Service** template. Adds
+          `platform/registry/${{ parameters.name }}.yaml`.
+
+  output:
+    links:
+      - title: Pull request
+        url: ${{ steps['open-pr'].output.remoteUrl }}

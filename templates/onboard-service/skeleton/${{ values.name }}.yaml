@@ -1,0 +1,14 @@
+apiVersion: platform.taskapp.io/v1alpha1
+kind: Component
+metadata:
+  name: ${{ values.name }}
+  labels:
+    platform.taskapp.io/component: ${{ values.name }}
+spec:
+  owner: ${{ values.owner }}
+  repository:
+    name: ${{ values.name }}
+    visibility: ${{ values.visibility }}
+  scaffold:
+    template: ${{ values.scaffoldTemplate }}
+    version: "${{ values.scaffoldVersion }}"

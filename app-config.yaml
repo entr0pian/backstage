@@ -115,6 +115,12 @@ catalog:
       rules:
         - allow: [Template]
 
+    # Onboard Service template — see BACKSTAGE.md (platform-architecture repo)
+    - type: file
+      target: ../../templates/onboard-service/template.yaml
+      rules:
+        - allow: [Template]
+
     # Local example organizational data
     - type: file
       target: ../../examples/org.yaml
