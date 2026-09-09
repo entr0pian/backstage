@@ -1,4 +1,3 @@
-{{- if .Values.baseUrl }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -6,11 +5,25 @@ metadata:
   labels:
     app: {{ .Chart.Name }}
 data:
+  # Layered on top of app-config.yaml + app-config.production.yaml (see
+  # deployment.yaml's args). Two jobs:
+  #   1. Cancel app-config.production.yaml's `database.client: pg` — we
+  #      haven't wired up Postgres yet (see backstage/README.md), so this
+  #      keeps the in-memory sqlite default instead of crashing on missing
+  #      POSTGRES_* env vars.
+  #   2. When Values.baseUrl is set, override the localhost defaults so the
+  #      app/backend/CORS URLs are actually reachable through the Ingress.
   app-config.cluster.yaml: |
-    app:
-      baseUrl: ${BACKSTAGE_BASE_URL}
     backend:
+      database:
+        client: better-sqlite3
+        connection: ':memory:'
+      {{- if .Values.baseUrl }}
       baseUrl: ${BACKSTAGE_BASE_URL}
       cors:
         origin: ${BACKSTAGE_BASE_URL}
-{{- end }}
+      {{- end }}
+    {{- if .Values.baseUrl }}
+    app:
+      baseUrl: ${BACKSTAGE_BASE_URL}
+    {{- end }}
