@@ -1,0 +1,16 @@
+{{- if .Values.baseUrl }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-config
+  labels:
+    app: {{ .Chart.Name }}
+data:
+  app-config.cluster.yaml: |
+    app:
+      baseUrl: ${BACKSTAGE_BASE_URL}
+    backend:
+      baseUrl: ${BACKSTAGE_BASE_URL}
+      cors:
+        origin: ${BACKSTAGE_BASE_URL}
+{{- end }}

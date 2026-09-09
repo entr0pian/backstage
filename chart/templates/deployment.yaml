@@ -1,0 +1,88 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}
+  labels:
+    app: {{ .Chart.Name }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ .Chart.Name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Chart.Name }}
+      {{- if .Values.baseUrl }}
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+      {{- end }}
+    spec:
+      containers:
+      - name: backstage
+        image: {{ include "backstage.image" . | quote }}
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        args:
+          - node
+          - packages/backend
+          - --config
+          - app-config.yaml
+          {{- if .Values.baseUrl }}
+          - --config
+          - app-config.cluster.yaml
+          {{- end }}
+        env:
+        {{- if .Values.baseUrl }}
+        - name: BACKSTAGE_BASE_URL
+          value: {{ .Values.baseUrl | quote }}
+        {{- end }}
+        {{- if .Values.github.secretPath }}
+        - name: GITHUB_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Release.Name }}-github-credentials
+              key: token
+        {{- end }}
+        ports:
+        - containerPort: 7007
+          name: http
+        readinessProbe:
+          tcpSocket:
+            port: http
+          initialDelaySeconds: 10
+          periodSeconds: 10
+        livenessProbe:
+          tcpSocket:
+            port: http
+          initialDelaySeconds: 20
+          periodSeconds: 20
+        resources:
+          {{- if .Values.resources }}
+          {{- toYaml .Values.resources | nindent 10 }}
+          {{- else }}
+          {}
+          {{- end }}
+        {{- if .Values.baseUrl }}
+        volumeMounts:
+        - name: cluster-config
+          mountPath: /app/app-config.cluster.yaml
+          subPath: app-config.cluster.yaml
+        {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- if .Values.baseUrl }}
+      volumes:
+      - name: cluster-config
+        configMap:
+          name: {{ .Release.Name }}-config
+      {{- end }}

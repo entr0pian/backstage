@@ -1,0 +1,41 @@
+replicaCount: 1
+
+image:
+  repository: ghcr.io/entr0pian/backstage
+  pullPolicy: Always
+  tag: ""
+
+service:
+  type: ClusterIP
+  port: 7007
+
+ingress:
+  enabled: false
+  className: nginx
+  path: /
+  pathType: Prefix
+
+# Externally-reachable base URL (e.g. https://backstage.example.com), used for
+# app.baseUrl / backend.baseUrl / backend.cors.origin. Leave empty to run on
+# the in-image app-config.yaml's localhost defaults — fine for a smoke test
+# reached via port-forward, wrong for anything reached through the Ingress.
+baseUrl: ""
+
+github:
+  # Path to the secret in AWS Secrets Manager holding the PAT the platform's
+  # other GitHub-talking operators (component-operator, scaffold-operator)
+  # already use for entr0pian — same underlying token, synced into this
+  # namespace too since a Kubernetes Secret can't be mounted cross-namespace.
+  # Expected JSON format: {"token": "<value>", "owner": "<github org or user>"}
+  # Leave empty to skip creating the ExternalSecret — the GitHub catalog
+  # integration and the Onboard Service template's PR step won't work without it.
+  secretPath: ""
+  clusterSecretStoreName: aws-secrets-manager
+
+resources: {}
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
