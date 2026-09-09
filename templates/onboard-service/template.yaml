@@ -73,6 +73,17 @@ spec:
           scaffoldTemplate: ${{ parameters.scaffoldTemplate }}
           scaffoldVersion: ${{ parameters.scaffoldVersion }}
 
+    # fetch:template only templates file *contents*, not file/directory
+    # names, so the skeleton's static component.yaml needs an explicit
+    # rename to <name>.yaml here.
+    - id: rename-component
+      name: Rename to component name
+      action: fs:rename
+      input:
+        files:
+          - from: platform/registry/component.yaml
+            to: platform/registry/${{ parameters.name }}.yaml
+
     - id: open-pr
       name: Open pull request
       action: publish:github:pull-request

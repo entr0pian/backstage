@@ -33,8 +33,9 @@ Kubernetes or GitHub repository-provisioning APIs directly. See
 after the PR merges.
 
 - **Template location**: `templates/onboard-service/template.yaml`
-  (+ `skeleton/${{ values.name }}.yaml`), registered as a catalog `Template`
-  location in `app-config.yaml`.
+  (+ `skeleton/component.yaml`, renamed to `<name>.yaml` by an `fs:rename`
+  step — `fetch:template` templates file contents, not file names),
+  registered as a catalog `Template` location in `app-config.yaml`.
 - **Destination repo**: `entr0pian/application-repositories`, via a PR from
   branch `backstage/onboard-<name>` (uses the built-in
   `publish:github:pull-request` scaffolder action — no custom backend plugin).
