@@ -104,6 +104,23 @@ catalog:
     pullRequestBranchName: backstage-integration
   rules:
     - allow: [Component, System, API, Resource, Location]
+  providers:
+    # Discovers catalog-info.yaml from every entr0pian repository — this is
+    # how a scaffolded platform component (see platform-scaffolds'
+    # golang-service catalog-info.yaml.tpl) becomes a Catalog entity without
+    # manual "Register Existing Component". Reuses the same GitHub PAT
+    # already configured under integrations.github above (GITHUB_TOKEN).
+    # See BACKSTAGE_PART2.md in platform-architecture for the full milestone.
+    github:
+      entr0pian:
+        organization: 'entr0pian'
+        catalogPath: '/catalog-info.yaml'
+        filters:
+          branch: 'main'
+          repository: '.*'
+        schedule:
+          frequency: { minutes: 30 }
+          timeout: { minutes: 3 }
   locations:
     # Local example data, file locations are relative to the backend process, typically `packages/backend`
     - type: file

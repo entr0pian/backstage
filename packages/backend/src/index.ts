@@ -34,6 +34,9 @@ backend.add(import('@backstage/plugin-catalog-backend'));
 backend.add(
   import('@backstage/plugin-catalog-backend-module-scaffolder-entity-model'),
 );
+// GitHub discovery — finds catalog-info.yaml in entr0pian repositories, see
+// catalog.providers.github in app-config.yaml (BACKSTAGE_PART2.md milestone)
+backend.add(import('@backstage/plugin-catalog-backend-module-github'));
 
 // See https://backstage.io/docs/features/software-catalog/configuration#subscribing-to-catalog-errors
 backend.add(import('@backstage/plugin-catalog-backend-module-logs'));
