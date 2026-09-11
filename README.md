@@ -145,3 +145,113 @@ service appears in the Catalog
   `Registered scheduled task: github-provider:entr0pian:refresh` at startup
   and a subsequent run with no `HttpError`/`Bad credentials` entries for
   that task.
+
+## Add Database template (Milestone 3)
+
+Milestone 3 (see `BACKSTAGE_PART3.md` in `platform-architecture`) lets a
+developer add a database to an existing service straight from its Catalog
+page, instead of hand-writing a `Database` CR.
+
+```
+Catalog → <component> → Platform Actions → + Add Database
+    ↓
+componentName is derived from the entity, not typed by the user
+    ↓
+form: Environment / Database name / Size
+    ↓
+Backstage renders a Database CR and opens a PR against
+entr0pian/application-repositories
+    ↓
+Developer reviews/merges the PR
+    ↓
+Existing GitOps flow takes over: the platform's Database XR
+(crossplane-compositions' apis/database) provisions the RDS instance
+```
+
+As with Milestone 1, Backstage only ever renders a file and opens a PR — it
+never creates a `Release` or talks to Kubernetes/Crossplane directly.
+
+- **Entity-page action**: `packages/app/src/modules/platformActions/`, a
+  small frontend module (same `createFrontendModule` pattern as
+  `modules/nav/`) registering one `EntityCardBlueprint` extension from
+  `@backstage/plugin-catalog-react/alpha` — the mechanism the app's new
+  frontend system (`createApp`/`features`) uses for entity-page cards,
+  in place of a hand-edited `EntityPage.tsx`. The card is filtered to
+  `kind: Component` + `spec.type: service` entities and links to the
+  template with the entity's name pre-filled.
+- **How `componentName` gets forwarded without manual entry**: the link is
+  `/create/templates/default/add-database?formData={"componentName":"<name>"}`.
+  `@backstage/plugin-scaffolder-react`'s `useFormDataFromQuery` hook reads
+  that `formData` query param as the form's initial state; the template
+  marks the field `ui:disabled: true` so it's shown but not editable.
+- **Template location**: `templates/add-database/template.yaml`
+  (+ `skeleton/database.yaml`, renamed to `<component>-db.yaml` by an
+  `fs:rename` step, same reason as Milestone 1's rename step), registered
+  as a catalog `Template` location in `app-config.yaml`.
+- **Destination repo**: `entr0pian/application-repositories`, via a PR from
+  branch `backstage/add-database-<component>-<environment>` (built-in
+  `publish:github:pull-request` action, no custom backend plugin).
+- **Destination path**: `platform/environments/<environment>/<component>-db.yaml`
+  — a `Database` CR, applied verbatim once merged.
+- **Environments offered**: `dev`, `prod` only — `management` is the
+  Argo CD control-plane cluster, not a database-hosting environment, even
+  though `platform/` CRs always land in a namespace on the management
+  cluster regardless of which env folder they're filed under (see
+  `application-repositories/README.md`'s `platform/` section).
+- **Size**: `small` / `medium` / `large`, matching
+  `crossplane-compositions/apis/database/xrd.yaml`'s `spec.size` enum
+  exactly — this template doesn't expose or invent any other tier.
+- **No duplicate-safety check**: unlike spec §13's ask, this template does
+  *not* pre-check whether `platform/environments/<env>/<component>-db.yaml`
+  already exists before opening the PR. `fetch:plain` (the built-in action
+  that would do the raw-content check) has no way to continue past a 404 —
+  the scaffolder step schema only supports `if`/`each` pre-execution
+  conditions, not catching a step's own failure — so a clean check without a
+  custom backend action isn't possible with built-in actions alone. Decided
+  with the user to ship without it for v1 and rely on PR review to catch a
+  duplicate (the PR description says as much). A small custom scaffolder
+  action is the documented path to add this later if it's worth the extra
+  code — see the "necessary" carve-out in `BACKSTAGE_PART3.md` §8.
+
+Example rendered manifest for `componentName=checkout`, `environment=dev`,
+`dbName=checkoutdb`, `size=small`:
+
+```yaml
+apiVersion: database.taskapp.io/v1alpha1
+kind: Database
+metadata:
+  name: checkout-db
+  labels:
+    platform.taskapp.io/component: checkout
+spec:
+  componentRef:
+    name: checkout
+  dbName: checkoutdb
+  size: small
+```
+
+### Running locally
+
+Same `GITHUB_TOKEN` as Milestone 1 — no new configuration. Start the app,
+open an existing service's Catalog page (one with `spec.type: service`,
+e.g. anything onboarded via Milestone 1 + discovered via Milestone 2), and
+the **Platform Actions** card with **+ Add Database** appears.
+
+### Testing the flow
+
+- **Template rendering** (no network, no Backstage runtime needed):
+  ```sh
+  node --test templates/add-database/render.test.mjs
+  ```
+- **Entity-link forwarding** (no network, no Backstage runtime needed):
+  ```sh
+  yarn workspace app test --testPathPatterns platformActions
+  ```
+  Verifies that given an entity named `checkout`, the generated link's
+  `formData` query param decodes to `{"componentName":"checkout"}`.
+- **End-to-end**: run the app locally as above, open a service's Catalog
+  page, click **+ Add Database**, confirm Component is shown and not
+  editable, fill in the rest with throwaway values, submit, confirm the PR
+  lands on `entr0pian/application-repositories` with the expected
+  `platform/environments/<env>/<component>-db.yaml`, then close it without
+  merging.

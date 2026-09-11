@@ -1,0 +1,104 @@
+apiVersion: scaffolder.backstage.io/v1beta3
+kind: Template
+metadata:
+  name: add-database
+  title: Add Database
+  description: >-
+    Add a database to an existing platform component by opening a pull
+    request against application-repositories with a Database CR. Backstage
+    does not create any Kubernetes resources directly — the existing
+    Argo CD / Crossplane flow picks up the Database once this PR is merged.
+spec:
+  owner: user:guest
+  type: resource
+
+  parameters:
+    - title: Database details
+      required:
+        - componentName
+        - environment
+        - dbName
+      properties:
+        componentName:
+          title: Component
+          type: string
+          description: >-
+            The platform component this database belongs to. Derived from
+            the Catalog entity you launched this from — not editable here.
+          ui:disabled: true
+        environment:
+          title: Environment
+          type: string
+          description: Environment this database is provisioned for.
+          enum:
+            - dev
+            - prod
+        dbName:
+          title: Database name
+          type: string
+          description: >-
+            Name of the database/schema to create (spec.dbName on the
+            Database CR).
+          pattern: '^[a-z][a-z0-9_]*$'
+        size:
+          title: Size
+          type: string
+          description: Sizing tier. Matches the platform's Database XRD exactly.
+          enum:
+            - small
+            - medium
+            - large
+          default: small
+
+  steps:
+    - id: render-database
+      name: Render Database manifest
+      action: fetch:template
+      input:
+        url: ./skeleton
+        targetPath: platform/environments/${{ parameters.environment }}
+        values:
+          componentName: ${{ parameters.componentName }}
+          dbName: ${{ parameters.dbName }}
+          size: ${{ parameters.size }}
+
+    # fetch:template only templates file *contents*, not file/directory
+    # names, so the skeleton's static database.yaml needs an explicit
+    # rename to <component>-db.yaml here (same reason onboard-service's
+    # component.yaml gets renamed).
+    - id: rename-database
+      name: Rename to <component>-db.yaml
+      action: fs:rename
+      input:
+        files:
+          - from: platform/environments/${{ parameters.environment }}/database.yaml
+            to: platform/environments/${{ parameters.environment }}/${{ parameters.componentName }}-db.yaml
+
+    - id: open-pr
+      name: Open pull request
+      action: publish:github:pull-request
+      input:
+        repoUrl: github.com?repo=application-repositories&owner=entr0pian
+        branchName: backstage/add-database-${{ parameters.componentName }}-${{ parameters.environment }}
+        title: 'Add database for ${{ parameters.componentName }} in ${{ parameters.environment }}'
+        description: |-
+          Adds a `Database` resource for `${{ parameters.componentName }}`.
+
+          | Field | Value |
+          |---|---|
+          | Component | `${{ parameters.componentName }}` |
+          | Environment | `${{ parameters.environment }}` |
+          | Database | `${{ parameters.dbName }}` |
+          | Size | `${{ parameters.size }}` |
+
+          Generated through Backstage's **Add Database** template. Adds
+          `platform/environments/${{ parameters.environment }}/${{ parameters.componentName }}-db.yaml`.
+
+          Note: this template does not check for an existing database
+          definition at that path — please confirm there isn't already one
+          for this component/environment before merging.
+
+  output:
+    links:
+      - title: Pull request
+        url: ${{ steps['open-pr'].output.remoteUrl }}
