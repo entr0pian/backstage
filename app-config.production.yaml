@@ -59,3 +59,9 @@ catalog:
       target: ./templates/onboard-service/template.yaml
       rules:
         - allow: [Template]
+
+    # Add Database template — see BACKSTAGE_PART3.md (platform-architecture repo)
+    - type: file
+      target: ./templates/add-database/template.yaml
+      rules:
+        - allow: [Template]

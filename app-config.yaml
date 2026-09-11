@@ -122,6 +122,13 @@ catalog:
           frequency: { minutes: 30 }
           timeout: { minutes: 3 }
   locations:
+    # NOTE: app-config.production.yaml (used by the deployed image, see its
+    # own CMD in packages/backend/Dockerfile) declares its OWN catalog.locations
+    # array that fully replaces this one at runtime — Backstage config arrays
+    # override, they don't merge across --config files. Any Template location
+    # added here (a new `- type: file` entry with `rules: [allow: [Template]]`)
+    # must be added to app-config.production.yaml too, or it silently never
+    # registers in the deployed instance despite looking correct here.
     # Local example data, file locations are relative to the backend process, typically `packages/backend`
     - type: file
       target: ../../examples/entities.yaml
