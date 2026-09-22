@@ -119,8 +119,12 @@ catalog:
           branch: 'main'
           repository: '.*'
         schedule:
-          frequency: { minutes: 30 }
-          timeout: { minutes: 3 }
+          # Was 30 min/3 min — lowered so a newly scaffolded (or deleted)
+          # repository shows up in the Catalog within ~2 minutes instead of
+          # up to half an hour. A full org scan (~17 repos today) completes
+          # in well under a minute, so 1 min timeout has headroom.
+          frequency: { minutes: 2 }
+          timeout: { minutes: 1 }
   locations:
     # NOTE: app-config.production.yaml (used by the deployed image, see its
     # own CMD in packages/backend/Dockerfile) declares its OWN catalog.locations
