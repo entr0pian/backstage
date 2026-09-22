@@ -170,6 +170,17 @@ catalog:
 kubernetes:
   # see https://backstage.io/docs/features/kubernetes/configuration for kubernetes configuration options
 
+# Platform Entity Provider — discovers Database CRs (database.taskapp.io)
+# from the configured namespaces and publishes them as catalog Resource
+# entities related to their owning Component (spec.componentRef). See
+# BACKSTAGE_PART4.md and packages/backend/src/modules/platformEntityProvider/.
+# Off by default so local `yarn start` needs no cluster; the deployed chart
+# turns this on via app-config.cluster.yaml (see chart/values.yaml's
+# platformCatalog block).
+platformCatalog:
+  enabled: false
+  namespaces: []
+
 # see https://backstage.io/docs/permissions/getting-started for more on the permission framework
 permission:
   # setting this to `false` will disable permissions

@@ -29,10 +29,17 @@ spec:
         environment:
           title: Environment
           type: string
-          description: Environment this database is provisioned for.
+          description: >-
+            Environment this database is provisioned for. "management" is
+            included alongside dev/prod for single-cluster setups (e.g. the
+            EKS management cluster standing in for dev while only one real
+            cluster exists) — platform/environments/<env> just picks a
+            namespace on the management cluster, never a destination
+            cluster, so this is safe regardless of which value is chosen.
           enum:
             - dev
             - prod
+            - management
         dbName:
           title: Database name
           type: string

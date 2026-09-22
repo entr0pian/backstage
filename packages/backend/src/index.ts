@@ -41,6 +41,13 @@ backend.add(import('@backstage/plugin-catalog-backend-module-github'));
 // See https://backstage.io/docs/features/software-catalog/configuration#subscribing-to-catalog-errors
 backend.add(import('@backstage/plugin-catalog-backend-module-logs'));
 
+// Platform Entity Provider — discovers Database CRs from the cluster and
+// publishes them as catalog Resource entities, related to their owning
+// Component via spec.componentRef. See BACKSTAGE_PART4.md and
+// modules/platformEntityProvider/. Independent of, and does not modify,
+// the GitHub-based Component discovery above.
+backend.add(import('./modules/platformEntityProvider/module'));
+
 // permission plugin
 backend.add(import('@backstage/plugin-permission-backend'));
 // See https://backstage.io/docs/permissions/getting-started for how to create your own permission policy

@@ -193,11 +193,13 @@ never creates a `Release` or talks to Kubernetes/Crossplane directly.
   `publish:github:pull-request` action, no custom backend plugin).
 - **Destination path**: `platform/environments/<environment>/<component>-db.yaml`
   — a `Database` CR, applied verbatim once merged.
-- **Environments offered**: `dev`, `prod` only — `management` is the
-  Argo CD control-plane cluster, not a database-hosting environment, even
-  though `platform/` CRs always land in a namespace on the management
-  cluster regardless of which env folder they're filed under (see
-  `application-repositories/README.md`'s `platform/` section).
+- **Environments offered**: `dev`, `prod`, `management`. `platform/` CRs
+  always land in a namespace on the management cluster regardless of which
+  env folder they're filed under (see `application-repositories/README.md`'s
+  `platform/` section) — `management` is included as a real choice, not just
+  a fallback, specifically for single-cluster setups (e.g. the EKS
+  management cluster standing in for dev/prod while only one real cluster
+  exists) where `dev`/`prod` aren't reachable at all.
 - **Size**: `small` / `medium` / `large`, matching
   `crossplane-compositions/apis/database/xrd.yaml`'s `spec.size` enum
   exactly — this template doesn't expose or invent any other tier.
@@ -255,3 +257,85 @@ the **Platform Actions** card with **+ Add Database** appears.
   lands on `entr0pian/application-repositories` with the expected
   `platform/environments/<env>/<component>-db.yaml`, then close it without
   merging.
+
+## Platform Entity Provider (Milestone 4)
+
+Milestone 4 (see `BACKSTAGE_PART4.md` in `platform-architecture`) closes the
+loop the other direction from Milestone 3: once a `Database` CR actually
+exists on the cluster, it shows up on its owning Component's Catalog page
+under **Depends on resources**, with no one editing that Component's
+`catalog-info.yaml` by hand.
+
+There are deliberately **two independent flows** — one writes, one reads,
+and neither depends on the other working:
+
+```
+COMMAND / WRITE PATH (Milestone 3, unchanged)
+
+  Developer → Backstage (+ Add Database) → GitHub PR → merge
+      → Argo CD → Database CR → Crossplane → RDS instance
+
+DISCOVERY / READ PATH (this milestone, new)
+
+  Database CR (spec.componentRef) → PlatformEntityProvider
+      → Backstage Catalog → Component --dependsOn--> Resource
+```
+
+- **`spec.componentRef` is the authoritative relationship** — the same rule
+  `PLATFORM_API_ARCHITECTURE.md` states for every platform CR. The provider
+  never reads or writes `dependsOn` into any repository's `catalog-info.yaml`.
+- **Backstage is a read-only projection of platform state, never the source
+  of truth.** The provider only ever calls the Kubernetes API's `get`/`list`/
+  `watch` verbs (RBAC-enforced — see `chart/templates/clusterrole.yaml`) and
+  never creates/updates/patches/deletes a `Database` or `Component` CR.
+  Removing Backstage entirely would not affect provisioning.
+- **Provider**: `packages/backend/src/modules/platformEntityProvider/`
+  (`PlatformEntityProvider.ts` polls, `DatabaseEntityMapper.ts` is the pure
+  CR→entity transform, `module.ts` registers it with the catalog). Polls
+  every 60s across the namespaces in `platformCatalog.namespaces`; a `Ready`/
+  provisioning-status display is an explicit future milestone, not this one
+  — the entity only encodes the static `dependencyOf` relationship.
+- **Entity naming**: `<kubernetes-namespace>-<database-name>` (e.g.
+  `dev-checkout-db`), kept in the Backstage `default` namespace like every
+  other entity — not the raw CR name — specifically so the same logical
+  database name in two environments (`dev/checkout-db` vs `prod/checkout-db`)
+  never collides.
+- **Auth**: `@kubernetes/client-node`'s `loadFromDefault()` — in-cluster
+  ServiceAccount token when deployed (see the chart's `serviceaccount.yaml`/
+  `clusterrole.yaml`/`clusterrolebinding.yaml`, gated by
+  `platformCatalog.enabled`), local kubeconfig otherwise. Off by default
+  (`app-config.yaml`'s `platformCatalog.enabled: false`) so `yarn start`
+  needs no cluster.
+- **Failure handling**: a namespace's list call failing skips that entire
+  refresh cycle (previous entities kept) rather than publishing a partial
+  `full` mutation that would wrongly evict entities Backstage simply failed
+  to observe this cycle — see the comment in `PlatformEntityProvider.refresh()`.
+
+### Running locally
+
+Requires a reachable cluster with the `databases.database.taskapp.io` CRD
+installed (any context in `~/.kube/config` works — `loadFromDefault()`
+doesn't require in-cluster). Set:
+
+```sh
+export GITHUB_TOKEN=<as above>
+```
+
+then in `app-config.local.yaml` (gitignored):
+
+```yaml
+platformCatalog:
+  enabled: true
+  namespaces: [dev]
+```
+
+### Testing the flow
+
+- **Mapper unit tests** (no network, no cluster needed):
+  ```sh
+  yarn workspace backend test --testPathPatterns=platformEntityProvider
+  ```
+- **End-to-end**: run **Add Database** (Milestone 3) for an existing
+  component, merge the PR, wait for Argo CD to sync the `Database` CR, then
+  wait up to 60s and refresh the component's Catalog page — the database
+  appears under **Depends on resources** and in the Relations graph.

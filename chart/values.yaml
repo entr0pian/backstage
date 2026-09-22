@@ -32,6 +32,19 @@ github:
   secretPath: ""
   clusterSecretStoreName: aws-secrets-manager
 
+platformCatalog:
+  # Discovers Database CRs from these namespaces and publishes them as
+  # catalog Resource entities. "management" is included alongside dev/prod
+  # so a single-cluster setup (e.g. this EKS cluster standing in for all
+  # three environments) still gets discovery — platform/environments/<env>
+  # just picks a namespace on whichever cluster runs release-operator, so
+  # this is harmless even once real dev/prod clusters exist too.
+  enabled: false
+  namespaces:
+    - dev
+    - prod
+    - management
+
 resources: {}
 
 nodeSelector: {}

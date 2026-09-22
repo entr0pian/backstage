@@ -16,6 +16,9 @@ spec:
       annotations:
         checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
     spec:
+      {{- if .Values.platformCatalog.enabled }}
+      serviceAccountName: {{ .Release.Name }}
+      {{- end }}
       containers:
       - name: backstage
         image: {{ include "backstage.image" . | quote }}
