@@ -45,6 +45,14 @@ data:
     # @backstage-community/plugin-argocd-backend's own config contract (see
     # BACKSTAGE_PART5.md Step 5) — not a custom platform.argocd.* shape.
     argocd:
+      # Despite the name, this is the plugin's only knob for trusting a
+      # self-signed cert (sets rejectUnauthorized: false on undici's global
+      # dispatcher — see @backstage-community/plugin-argocd-node's
+      # ArgoCDService constructor). Needed here because ArgoCD always
+      # terminates TLS itself with a self-signed cert (server.insecure not
+      # set in bootstrap-cluster/install-argocd/values.yaml) — not actually
+      # a "local dev only" concern in this cluster.
+      localDevelopment: true
       appLocatorMethods:
         - type: config
           instances:

@@ -35,7 +35,12 @@ github:
 argocd:
   # In-cluster ArgoCD server URL — both Backstage and ArgoCD run on the same
   # management cluster, so this never needs to leave the cluster network.
-  baseUrl: "http://argocd-server.argocd.svc.cluster.local"
+  # Must be https:// even in-cluster: the argo-cd chart's server always
+  # terminates TLS itself (self-signed cert, server.insecure not set) —
+  # confirmed by the Service exposing both 80 and 443 pointing at the same
+  # container port 8080, and plain http:// getting a 307 redirect to
+  # https:// rather than actually serving anything.
+  baseUrl: "https://argocd-server.argocd.svc.cluster.local"
   # Path to the secret in AWS Secrets Manager holding the read-only ArgoCD
   # API token for the "backstage" account (see bootstrap-cluster/install-argocd
   # values.yaml's accounts.backstage / policy.csv, and
