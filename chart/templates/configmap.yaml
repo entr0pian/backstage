@@ -42,10 +42,13 @@ data:
       namespaces: {{ .Values.platformCatalog.namespaces | toJson }}
     {{- end }}
     {{- if .Values.deployments.enabled }}
-    platform:
-      deployments:
-        enabled: true
-      argocd:
-        baseUrl: {{ .Values.argocd.baseUrl | quote }}
-        token: ${ARGOCD_TOKEN}
+    # @backstage-community/plugin-argocd-backend's own config contract (see
+    # BACKSTAGE_PART5.md Step 5) — not a custom platform.argocd.* shape.
+    argocd:
+      appLocatorMethods:
+        - type: config
+          instances:
+            - name: primary
+              url: ${ARGOCD_URL}
+              token: ${ARGOCD_TOKEN}
     {{- end }}

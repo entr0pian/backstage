@@ -48,6 +48,21 @@ backend.add(import('@backstage/plugin-catalog-backend-module-logs'));
 // the GitHub-based Component discovery above.
 backend.add(import('./modules/platformEntityProvider/module'));
 
+// Stamps argocd/app-selector onto every Component entity as it's ingested
+// (derived from the entity's own name — never hand-authored per repo). See
+// BACKSTAGE_PART5.md's "Annotations" section and modules/argocdAnnotator/.
+backend.add(import('./modules/argocdAnnotator/module'));
+
+// Argo CD plugin backend — sync/health/revision per Application, discovered
+// via the argocd/app-selector annotation above. See BACKSTAGE_PART5.md.
+backend.add(import('@backstage-community/plugin-argocd-backend'));
+
+// Release Versions — exposes GET /api/platform/releases/:component, reading
+// Release CRs (platform.taskapp.io/v1alpha1) independently of the Argo CD
+// plugin above. See BACKSTAGE_PART5.md Step 2 and
+// modules/releaseVersions/.
+backend.add(import('./modules/releaseVersions/module'));
+
 // permission plugin
 backend.add(import('@backstage/plugin-permission-backend'));
 // See https://backstage.io/docs/permissions/getting-started for how to create your own permission policy
