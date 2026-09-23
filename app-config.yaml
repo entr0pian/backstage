@@ -181,6 +181,13 @@ catalog:
       rules:
         - allow: [Group]
 
+    # The owner User entity the GitHub sign-in resolves to — see
+    # org-data/users.yaml.
+    - type: file
+      target: ../../org-data/users.yaml
+      rules:
+        - allow: [User]
+
     ## Uncomment these lines to add more example data
     # - type: url
     #   target: https://github.com/backstage/backstage/blob/master/packages/catalog-model/examples/all.yaml

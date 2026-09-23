@@ -13,6 +13,9 @@ import SearchIcon from '@material-ui/icons/Search';
 import { SidebarSearchModal } from '@backstage/plugin-search';
 import { UserSettingsSignInAvatar } from '@backstage/plugin-user-settings';
 import { NotificationsSidebarItem } from '@backstage/plugin-notifications';
+import { catalogEntityCreatePermission } from '@backstage/plugin-catalog-common/alpha';
+import { taskCreatePermission } from '@backstage/plugin-scaffolder-common/alpha';
+import { IfAllowed } from './IfAllowed';
 
 export const SidebarContent = NavContentBlueprint.make({
   params: {
@@ -24,6 +27,9 @@ export const SidebarContent = NavContentBlueprint.make({
       // Skipped items
       nav.take('page:search'); // Using search modal instead
       nav.take('page:notifications'); // Using NotificationsSidebarItem manually instead
+      // Owner-only entries, hidden from guests (see modules/permissionPolicy
+      // in the backend) — the same permissions each page itself checks.
+      const registerComponent = nav.take('page:catalog-import');
 
       return (
         <Sidebar>
@@ -34,10 +40,15 @@ export const SidebarContent = NavContentBlueprint.make({
           <SidebarDivider />
           <SidebarGroup label="Menu" icon={<MenuIcon />}>
             {nav.take('page:catalog')}
-            {nav.take('page:scaffolder')}
+            <IfAllowed permission={taskCreatePermission}>
+              {nav.take('page:scaffolder')}
+            </IfAllowed>
             <SidebarDivider />
             <SidebarScrollWrapper>
               {nav.rest({ sortBy: 'title' })}
+              <IfAllowed permission={catalogEntityCreatePermission}>
+                {registerComponent}
+              </IfAllowed>
             </SidebarScrollWrapper>
           </SidebarGroup>
           <SidebarSpace />

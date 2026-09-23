@@ -1,0 +1,15 @@
+# The portal owner. Its name must equal the GitHub username: the GitHub
+# sign-in resolver (usernameMatchingUserEntityName) only lets a GitHub user
+# in when a User entity with that exact name exists, and the backend
+# permission policy (packages/backend/src/modules/permissionPolicy) grants
+# full access to user:default/entr0pian only — everyone else browses
+# read-only as a guest.
+---
+apiVersion: backstage.io/v1alpha1
+kind: User
+metadata:
+  name: entr0pian
+spec:
+  profile:
+    displayName: entr0pian
+  memberOf: []

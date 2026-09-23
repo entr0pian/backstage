@@ -44,6 +44,18 @@ spec:
               name: {{ .Release.Name }}-github-credentials
               key: token
         {{- end }}
+        {{- if .Values.githubAuth.secretPath }}
+        - name: AUTH_GITHUB_CLIENT_ID
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Release.Name }}-github-auth
+              key: clientId
+        - name: AUTH_GITHUB_CLIENT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Release.Name }}-github-auth
+              key: clientSecret
+        {{- end }}
         {{- if .Values.argocd.secretPath }}
         - name: ARGOCD_URL
           value: {{ .Values.argocd.baseUrl | quote }}

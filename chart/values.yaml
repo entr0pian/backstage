@@ -51,6 +51,17 @@ argocd:
   secretPath: ""
   clusterSecretStoreName: aws-secrets-manager
 
+githubAuth:
+  # Path to the secret in AWS Secrets Manager holding the GitHub OAuth App
+  # credentials for the owner sign-in (bootstrap-cluster/terraform's
+  # backstage-github-oauth.tf creates the secret; its value is set by hand).
+  # The OAuth App's callback URL must be <baseUrl>/api/auth/github/handler/frame.
+  # Expected JSON format: {"clientId": "<value>", "clientSecret": "<value>"}
+  # Leave empty to skip creating the ExternalSecret and leave the GitHub
+  # sign-in unconfigured — guest (read-only) is then the only way in.
+  secretPath: ""
+  clusterSecretStoreName: aws-secrets-manager
+
 deployments:
   # Gates both the app-config platform.deployments/platform.argocd block and
   # (indirectly, since the ExternalSecret needs argocd.secretPath too) the

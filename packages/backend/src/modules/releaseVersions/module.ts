@@ -29,8 +29,10 @@ export const releaseVersionsModule = createBackendPlugin({
         const namespaces =
           config.getOptionalStringArray('platformCatalog.namespaces') ?? [];
         const reader = new ReleaseVersionReader({ namespaces, logger });
+        // No addAuthPolicy: the default (user or service credentials
+        // required) is what we want — the Deployments card calls this via
+        // fetchApi, which already sends the signed-in user's token.
         httpRouter.use(createRouter(reader));
-        httpRouter.addAuthPolicy({ path: '/releases', allow: 'unauthenticated' });
       },
     });
   },

@@ -3545,18 +3545,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@backstage/plugin-permission-backend-module-allow-all-policy@npm:^0.2.23":
-  version: 0.2.23
-  resolution: "@backstage/plugin-permission-backend-module-allow-all-policy@npm:0.2.23"
-  dependencies:
-    "@backstage/backend-plugin-api": "npm:^1.10.1"
-    "@backstage/plugin-auth-node": "npm:^0.7.6"
-    "@backstage/plugin-permission-common": "npm:^0.9.11"
-    "@backstage/plugin-permission-node": "npm:^0.11.4"
-  checksum: 10c0/22f679f859485b4482d0dead647d5644280673df14bb870b382a5ddd55ce2a13263f24b6b34981d1794eb3fdf5b4e8ed52ccded3c09c9531ba8f9339d0fa3916
-  languageName: node
-  linkType: hard
-
 "@backstage/plugin-permission-backend@npm:^0.7.16":
   version: 0.7.16
   resolution: "@backstage/plugin-permission-backend@npm:0.7.16"
@@ -13699,13 +13687,17 @@ __metadata:
     "@backstage/plugin-app-visualizer": "npm:^0.2.8"
     "@backstage/plugin-auth": "npm:^0.1.12"
     "@backstage/plugin-catalog": "npm:^2.0.9"
+    "@backstage/plugin-catalog-common": "npm:^1.2.0"
     "@backstage/plugin-catalog-graph": "npm:^0.6.8"
     "@backstage/plugin-catalog-import": "npm:^0.13.18"
     "@backstage/plugin-catalog-react": "npm:^3.2.3"
     "@backstage/plugin-kubernetes": "npm:^0.12.23"
     "@backstage/plugin-notifications": "npm:^0.6.0"
     "@backstage/plugin-org": "npm:^0.7.9"
+    "@backstage/plugin-permission-common": "npm:^0.9.11"
+    "@backstage/plugin-permission-react": "npm:^0.5.5"
     "@backstage/plugin-scaffolder": "npm:^1.39.0"
+    "@backstage/plugin-scaffolder-common": "npm:^2.3.0"
     "@backstage/plugin-search": "npm:^1.7.8"
     "@backstage/plugin-signals": "npm:^0.0.35"
     "@backstage/plugin-techdocs": "npm:^1.18.2"
@@ -14347,18 +14339,19 @@ __metadata:
     "@backstage/plugin-catalog-backend-module-github": "npm:^0.14.0"
     "@backstage/plugin-catalog-backend-module-logs": "npm:^0.1.26"
     "@backstage/plugin-catalog-backend-module-scaffolder-entity-model": "npm:^0.2.24"
+    "@backstage/plugin-catalog-common": "npm:^1.2.0"
     "@backstage/plugin-catalog-node": "npm:^2.2.5"
     "@backstage/plugin-kubernetes-backend": "npm:^0.21.11"
     "@backstage/plugin-mcp-actions-backend": "npm:^0.2.2"
     "@backstage/plugin-notifications-backend": "npm:^0.6.9"
     "@backstage/plugin-permission-backend": "npm:^0.7.16"
-    "@backstage/plugin-permission-backend-module-allow-all-policy": "npm:^0.2.23"
     "@backstage/plugin-permission-common": "npm:^0.9.11"
     "@backstage/plugin-permission-node": "npm:^0.11.4"
     "@backstage/plugin-proxy-backend": "npm:^0.6.18"
     "@backstage/plugin-scaffolder-backend": "npm:^4.2.0"
     "@backstage/plugin-scaffolder-backend-module-github": "npm:^0.10.0"
     "@backstage/plugin-scaffolder-backend-module-notifications": "npm:^0.1.26"
+    "@backstage/plugin-scaffolder-common": "npm:^2.3.0"
     "@backstage/plugin-search-backend": "npm:^2.1.7"
     "@backstage/plugin-search-backend-module-catalog": "npm:^0.3.19"
     "@backstage/plugin-search-backend-module-pg": "npm:^0.5.59"

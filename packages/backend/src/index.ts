@@ -28,6 +28,10 @@ backend.add(import('@backstage/plugin-auth-backend'));
 // See https://backstage.io/docs/backend-system/building-backends/migrating#the-auth-plugin
 backend.add(import('@backstage/plugin-auth-backend-module-guest-provider'));
 // See https://backstage.io/docs/auth/guest/provider
+// Owner sign-in — only registered when auth.providers.github is configured
+// (the chart's githubAuth block); the resolver only accepts GitHub users
+// with a matching User entity, i.e. org-data/users.yaml.
+backend.add(import('@backstage/plugin-auth-backend-module-github-provider'));
 
 // catalog plugin
 backend.add(import('@backstage/plugin-catalog-backend'));
@@ -63,12 +67,10 @@ backend.add(import('@backstage-community/plugin-argocd-backend'));
 // modules/releaseVersions/.
 backend.add(import('./modules/releaseVersions/module'));
 
-// permission plugin
+// permission plugin — guests browse read-only, only the owner can act.
+// See modules/permissionPolicy/.
 backend.add(import('@backstage/plugin-permission-backend'));
-// See https://backstage.io/docs/permissions/getting-started for how to create your own permission policy
-backend.add(
-  import('@backstage/plugin-permission-backend-module-allow-all-policy'),
-);
+backend.add(import('./modules/permissionPolicy/module'));
 
 // search plugin
 backend.add(import('@backstage/plugin-search-backend'));

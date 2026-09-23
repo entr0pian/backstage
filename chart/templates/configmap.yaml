@@ -15,14 +15,29 @@ data:
   #      app/backend/CORS URLs are actually reachable through the Ingress.
   #   3. Allow the guest auth provider outside a dev environment — Backstage
   #      refuses it by default whenever NODE_ENV=production (which the
-  #      Dockerfile always sets), and this milestone has no real IdP wired
-  #      up yet, so guest auth with an explicit opt-in is the correct
-  #      tradeoff for now rather than a misconfiguration to work around.
+  #      Dockerfile always sets). Guest is deliberate here: it's how
+  #      visitors browse the portfolio, and the backend permission policy
+  #      (packages/backend/src/modules/permissionPolicy) keeps them
+  #      read-only.
+  #   4. When Values.githubAuth.secretPath is set, configure the owner's
+  #      GitHub sign-in. usernameMatchingUserEntityName only admits a
+  #      GitHub user with a matching User entity (org-data/users.yaml), so
+  #      no other GitHub account can sign in at all.
   app-config.cluster.yaml: |
     auth:
+      environment: production
       providers:
         guest:
           dangerouslyAllowOutsideDevelopment: true
+        {{- if .Values.githubAuth.secretPath }}
+        github:
+          production:
+            clientId: ${AUTH_GITHUB_CLIENT_ID}
+            clientSecret: ${AUTH_GITHUB_CLIENT_SECRET}
+            signIn:
+              resolvers:
+                - resolver: usernameMatchingUserEntityName
+        {{- end }}
     backend:
       database:
         client: better-sqlite3
