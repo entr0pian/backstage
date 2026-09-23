@@ -13685,6 +13685,7 @@ __metadata:
   resolution: "app@workspace:packages/app"
   dependencies:
     "@backstage-community/plugin-argocd": "npm:^3.1.2"
+    "@backstage/catalog-model": "npm:^1.10.1"
     "@backstage/cli": "npm:^0.36.6"
     "@backstage/core-components": "npm:^0.18.14"
     "@backstage/core-plugin-api": "npm:^1.12.10"

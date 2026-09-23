@@ -11,6 +11,19 @@ app:
         config:
           path: /
 
+    # Disable stock Backstage Catalog cards that are empty/near-empty for
+    # every service here today (no APIs registered, no manual System/Domain
+    # modeling) — see platform-architecture/BACKSTAGE_PART6.md. Platform
+    # data gets its own purpose-built cards (Deployments, Dependencies)
+    # instead. Catalog relationships themselves are untouched — this only
+    # hides the generic presentation of them on Overview.
+    - entity-card:catalog/depends-on-components: false
+    - entity-card:catalog/depends-on-resources: false
+    - entity-card:catalog/has-subcomponents: false
+    - entity-card:api-docs/provided-apis: false
+    - entity-card:api-docs/consumed-apis: false
+    - entity-card:catalog-graph/relations: false
+
 organization:
   name: My Company
 
@@ -160,6 +173,13 @@ catalog:
       target: ../../examples/org.yaml
       rules:
         - allow: [User, Group]
+
+    # Real team Group entities — see org-data/teams.yaml and
+    # BACKSTAGE_PART6.md item 15.
+    - type: file
+      target: ../../org-data/teams.yaml
+      rules:
+        - allow: [Group]
 
     ## Uncomment these lines to add more example data
     # - type: url

@@ -1,0 +1,16 @@
+# Real (non-example) Group entities for team names already used as a
+# Component's spec.owner — see platform-architecture/BACKSTAGE_PART6.md
+# item 15. Not GitHub org/team sync (that's real scope beyond this UI
+# milestone, tracked as a follow-up there) — just enough for the owner
+# relation on each Component page to resolve instead of warning.
+#
+# Add one entry here whenever a new team name is used as an owner and
+# doesn't already exist below.
+---
+apiVersion: backstage.io/v1alpha1
+kind: Group
+metadata:
+  name: payments-team
+spec:
+  type: team
+  children: []

@@ -2,18 +2,18 @@ import { createFrontendModule } from '@backstage/frontend-plugin-api';
 import { EntityCardBlueprint } from '@backstage/plugin-catalog-react/alpha';
 import type { Entity } from '@backstage/catalog-model';
 
-const releaseVersionsCard = EntityCardBlueprint.make({
-  name: 'release-versions',
+const dependenciesCard = EntityCardBlueprint.make({
+  name: 'dependencies',
   params: {
     type: 'info',
     filter: (entity: Entity) =>
       entity.kind === 'Component' && entity.spec?.type === 'service',
     loader: () =>
-      import('./ReleaseVersionsCard').then(m => <m.ReleaseVersionsCard />),
+      import('./DependenciesCard').then(m => <m.DependenciesCard />),
   },
 });
 
-export const releaseVersionsModule = createFrontendModule({
+export const dependenciesModule = createFrontendModule({
   pluginId: 'app',
-  extensions: [releaseVersionsCard],
+  extensions: [dependenciesCard],
 });

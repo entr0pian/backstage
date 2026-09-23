@@ -5,14 +5,16 @@ import argocdPlugin, {
 } from '@backstage-community/plugin-argocd';
 import { navModule } from './modules/nav';
 import { platformActionsModule } from './modules/platformActions';
-import { releaseVersionsModule } from './modules/releaseVersions';
+import { deploymentsModule } from './modules/deployments';
+import { dependenciesModule } from './modules/dependencies';
 
 export default createApp({
   features: [
     catalogPlugin,
     navModule,
     platformActionsModule,
-    releaseVersionsModule,
+    deploymentsModule,
+    dependenciesModule,
     argocdPlugin,
     argocdTranslationsModule,
   ],
