@@ -1,23 +1,18 @@
 /* @backstage/ui's own stylesheet (imported in index.tsx) sets
  * `body { background-color: var(--bui-bg-app) }` inside `@layer base`, but
- * never gives html/body a height — so by default CSS behavior that
- * background only paints as far as page content reaches, not the full
- * viewport, and a short page (e.g. the simplified Component Overview) shows
- * plain white below it. This rule is deliberately NOT inside a CSS @layer,
- * so it always wins over @backstage/ui's layered rules and the legacy
- * @material-ui/core styles this app also loads, regardless of import order.
+ * never gives body a height — so on a short page (e.g. the simplified
+ * Component Overview) body ends where the content ends and the area below
+ * it renders white.
+ *
+ * `100vh`, not `100%`: html has no explicit height, so a percentage
+ * min-height on body resolves to auto and does nothing. And the background
+ * must stay on body, not html: `data-theme-mode` (and with it the dark
+ * `--bui-bg-app` value) lives on body, so html would always resolve the
+ * light-mode token and show a light band under dark-mode pages.
+ *
+ * Deliberately NOT inside a CSS @layer, so it wins over @backstage/ui's
+ * layered rules regardless of import order.
  */
-html,
-body,
-#root {
-  min-height: 100%;
-}
-
-/* Belt-and-suspenders on top of the min-height fix above: pin the
- * background-color explicitly too, so it can't be won by the legacy
- * @material-ui/core theme's own (different) dark background default for
- * any element between #root and body that isn't itself styled. */
-html,
 body {
-  background-color: var(--bui-bg-app);
+  min-height: 100vh;
 }
