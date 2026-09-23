@@ -44,6 +44,15 @@ spec:
               name: {{ .Release.Name }}-github-credentials
               key: token
         {{- end }}
+        {{- if .Values.argocd.secretPath }}
+        - name: ARGOCD_URL
+          value: {{ .Values.argocd.baseUrl | quote }}
+        - name: ARGOCD_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Release.Name }}-argocd-credentials
+              key: token
+        {{- end }}
         ports:
         - containerPort: 7007
           name: http

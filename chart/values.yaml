@@ -32,6 +32,27 @@ github:
   secretPath: ""
   clusterSecretStoreName: aws-secrets-manager
 
+argocd:
+  # In-cluster ArgoCD server URL — both Backstage and ArgoCD run on the same
+  # management cluster, so this never needs to leave the cluster network.
+  baseUrl: "http://argocd-server.argocd.svc.cluster.local"
+  # Path to the secret in AWS Secrets Manager holding the read-only ArgoCD
+  # API token for the "backstage" account (see bootstrap-cluster/install-argocd
+  # values.yaml's accounts.backstage / policy.csv, and
+  # platform-architecture/BACKSTAGE_PART5.md Step 9/10).
+  # Expected JSON format: {"token": "<value>"}
+  # Leave empty to skip creating the ExternalSecret and disable the
+  # Deployments tab's ArgoCD integration.
+  secretPath: ""
+  clusterSecretStoreName: aws-secrets-manager
+
+deployments:
+  # Gates both the app-config platform.deployments/platform.argocd block and
+  # (indirectly, since the ExternalSecret needs argocd.secretPath too) the
+  # backend's Deployments-tab endpoint. Disableable for local dev per
+  # BACKSTAGE_PART5.md Step 9.
+  enabled: false
+
 platformCatalog:
   # Discovers Database CRs from these namespaces and publishes them as
   # catalog Resource entities. "management" is included alongside dev/prod

@@ -16,4 +16,12 @@ rules:
   - apiGroups: ["database.taskapp.io"]
     resources: ["databases"]
     verbs: ["get", "list", "watch"]
+  # Read-only, for the Deployments tab's Release-CR discovery — see
+  # BACKSTAGE_PART5.md Step 11. Same ClusterRole, not a second one: both
+  # rules are read-only access for this one ServiceAccount, and Release
+  # CRs live in the same namespaces platformCatalog.namespaces already
+  # configures.
+  - apiGroups: ["platform.taskapp.io"]
+    resources: ["releases"]
+    verbs: ["get", "list", "watch"]
 {{- end }}

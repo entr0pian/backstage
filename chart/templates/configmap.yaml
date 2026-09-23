@@ -41,3 +41,11 @@ data:
       enabled: true
       namespaces: {{ .Values.platformCatalog.namespaces | toJson }}
     {{- end }}
+    {{- if .Values.deployments.enabled }}
+    platform:
+      deployments:
+        enabled: true
+      argocd:
+        baseUrl: {{ .Values.argocd.baseUrl | quote }}
+        token: ${ARGOCD_TOKEN}
+    {{- end }}
