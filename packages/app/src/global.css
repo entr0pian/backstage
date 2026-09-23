@@ -12,3 +12,12 @@ body,
 #root {
   min-height: 100%;
 }
+
+/* Belt-and-suspenders on top of the min-height fix above: pin the
+ * background-color explicitly too, so it can't be won by the legacy
+ * @material-ui/core theme's own (different) dark background default for
+ * any element between #root and body that isn't itself styled. */
+html,
+body {
+  background-color: var(--bui-bg-app);
+}
