@@ -5,7 +5,10 @@ import type { Entity } from '@backstage/catalog-model';
 const deploymentsCard = EntityCardBlueprint.make({
   name: 'deployments',
   params: {
-    type: 'info',
+    // 'content' (not 'info'): platform state belongs in the wide main
+    // column, not the narrow sidebar reserved for metadata — see
+    // DefaultEntityContentLayout's card-type -> grid-column mapping.
+    type: 'content',
     filter: (entity: Entity) =>
       entity.kind === 'Component' && entity.spec?.type === 'service',
     loader: () =>

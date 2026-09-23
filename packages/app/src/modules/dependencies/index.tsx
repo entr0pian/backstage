@@ -5,7 +5,8 @@ import type { Entity } from '@backstage/catalog-model';
 const dependenciesCard = EntityCardBlueprint.make({
   name: 'dependencies',
   params: {
-    type: 'info',
+    // 'content', matching deployments/index.tsx — see that file's comment.
+    type: 'content',
     filter: (entity: Entity) =>
       entity.kind === 'Component' && entity.spec?.type === 'service',
     loader: () =>

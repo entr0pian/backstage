@@ -66,6 +66,10 @@ COPY --chown=node:node examples ./examples
 # Onboard Service template — see BACKSTAGE.md (platform-architecture repo)
 COPY --chown=node:node templates ./templates
 
+# Real team Group entities — see org-data/teams.yaml and
+# BACKSTAGE_PART6.md item 15.
+COPY --chown=node:node org-data ./org-data
+
 # Then copy the rest of the backend bundle, along with any other files we might want.
 COPY --chown=node:node packages/backend/dist/bundle.tar.gz app-config*.yaml ./
 RUN tar xzf bundle.tar.gz && rm bundle.tar.gz
