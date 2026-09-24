@@ -19,6 +19,7 @@ import { entityRouteRef } from '@backstage/plugin-catalog-react';
 import type { ReactNode } from 'react';
 import { argoApplicationUrl, type Deployment } from './joinDeployments';
 import { useEnvironmentDetails, type EnvironmentDetails } from './useEnvironmentDetails';
+import { shortVersion } from '../platformUi';
 
 function age(since: string | null): string {
   if (!since) return '—';
@@ -36,7 +37,6 @@ function time(value: string | null): string {
     : d.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
 }
 
-const shortVersion = (v: string) => (/^[0-9a-f]{40}$/.test(v) ? v.slice(0, 7) : v);
 
 const Section = ({ title, aside, children }: { title: string; aside?: ReactNode; children: ReactNode }) => (
   <Box mt={3}>

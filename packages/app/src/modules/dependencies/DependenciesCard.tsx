@@ -1,20 +1,126 @@
-import { InfoCard, Progress, ResponseErrorPanel } from '@backstage/core-components';
-import { RELATION_DEPENDS_ON } from '@backstage/catalog-model';
+import Box from '@material-ui/core/Box';
+import List from '@material-ui/core/List';
+import ListItem from '@material-ui/core/ListItem';
+import Typography from '@material-ui/core/Typography';
+import { makeStyles } from '@material-ui/core/styles';
+import StorageIcon from '@material-ui/icons/Storage';
+import CategoryIcon from '@material-ui/icons/Category';
+import {
+  InfoCard,
+  Progress,
+  ResponseErrorPanel,
+  StatusError,
+  StatusOK,
+  StatusPending,
+} from '@backstage/core-components';
+import { RELATION_DEPENDS_ON, type Entity } from '@backstage/catalog-model';
 import {
   EntityRefLink,
   useEntity,
   useRelatedEntities,
 } from '@backstage/plugin-catalog-react';
 import { groupByType } from './groupByType';
+import { EnvironmentChip } from '../platformUi';
+import { useDatabaseDetails } from '../databases/useDatabaseDetails';
 
-// Renders the dependsOn relations PlatformEntityProvider already publishes
-// (Database -> Component, via spec.dependencyOf — see
-// modules/platformEntityProvider/DatabaseEntityMapper.ts). No new
-// discovery logic here — Catalog relations remain the source of truth, per
-// platform-architecture/BACKSTAGE_PART6.md. Renders nothing at all when
-// there are no dependencies, rather than an empty card — see that doc's
-// "Empty-state philosophy".
+const useStyles = makeStyles(theme => ({
+  groupLabel: {
+    color: theme.palette.text.secondary,
+    display: 'block',
+    marginTop: theme.spacing(1),
+  },
+  row: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: theme.spacing(2),
+    padding: theme.spacing(1.25, 1),
+  },
+  icon: {
+    color: theme.palette.primary.main,
+    backgroundColor: theme.palette.action.hover,
+    borderRadius: theme.shape.borderRadius,
+    padding: theme.spacing(0.75),
+    boxSizing: 'content-box',
+  },
+  main: {
+    flex: 1,
+    minWidth: 0,
+  },
+  name: {
+    fontWeight: 600,
+  },
+}));
+
+// Live status line for a platform Database, from the same guest-safe route
+// the Database page uses (BACKSTAGE_PART9.md Part B).
+const DatabaseStatus = ({ namespace, name }: { namespace: string; name: string }) => {
+  const state = useDatabaseDetails(namespace, name);
+  if (state.status === 'loading') {
+    return (
+      <Typography variant="caption" color="textSecondary">
+        checking…
+      </Typography>
+    );
+  }
+  if (state.status === 'error') {
+    return <StatusPending>Status unavailable</StatusPending>;
+  }
+  const d = state.details;
+  const facts = [
+    d.engine && [d.engine.engine, d.engine.version].filter(Boolean).join(' '),
+    d.spec.size,
+  ]
+    .filter(Boolean)
+    .join(' · ');
+  return (
+    <Box display="flex" alignItems="center" style={{ gap: 12 }}>
+      {d.ready === true && <StatusOK>Ready</StatusOK>}
+      {d.ready === false && <StatusError>Not ready</StatusError>}
+      {d.ready === null && <StatusPending>Unknown</StatusPending>}
+      {facts && (
+        <Typography variant="caption" color="textSecondary">
+          {facts}
+        </Typography>
+      )}
+    </Box>
+  );
+};
+
+const DependencyRow = ({ dependency }: { dependency: Entity }) => {
+  const classes = useStyles();
+  const annotations = dependency.metadata.annotations ?? {};
+  const environment = annotations['platform.taskapp.io/environment'];
+  const k8sNamespace = annotations['platform.taskapp.io/kubernetes-namespace'];
+  const dbName = annotations['platform.taskapp.io/database-name'];
+  const isPlatformDatabase = dependency.spec?.type === 'database' && k8sNamespace && dbName;
+  const Icon = dependency.spec?.type === 'database' ? StorageIcon : CategoryIcon;
+
+  return (
+    <ListItem className={classes.row} divider>
+      <Icon className={classes.icon} fontSize="small" />
+      <Box className={classes.main}>
+        <Typography variant="body1" className={classes.name} component="div">
+          <EntityRefLink entityRef={dependency} hideIcon />
+        </Typography>
+        {isPlatformDatabase ? (
+          <DatabaseStatus namespace={k8sNamespace} name={dbName} />
+        ) : (
+          dependency.metadata.description && (
+            <Typography variant="caption" color="textSecondary">
+              {dependency.metadata.description}
+            </Typography>
+          )
+        )}
+      </Box>
+      {environment && <EnvironmentChip environment={environment} />}
+    </ListItem>
+  );
+};
+
+// What this service depends on at runtime, grouped by type — each row links
+// to its own page and, for platform Databases, shows live status.
 export const DependenciesCard = () => {
+  const classes = useStyles();
   const { entity } = useEntity();
   const { entities, loading, error } = useRelatedEntities(entity, {
     type: RELATION_DEPENDS_ON,
@@ -45,21 +151,21 @@ export const DependenciesCard = () => {
   }
 
   return (
-    <InfoCard title="Dependencies">
+    <InfoCard title="Dependencies" subheader="Infrastructure this service uses">
       {groups.map(group => (
-        <div key={group.type}>
-          <strong>{group.label}</strong>
-          <ul>
+        <Box key={group.type}>
+          <Typography variant="overline" className={classes.groupLabel}>
+            {group.label}
+          </Typography>
+          <List disablePadding>
             {group.entities.map(dependency => (
-              <li key={`${dependency.kind}:${dependency.metadata.namespace}/${dependency.metadata.name}`}>
-                <EntityRefLink entityRef={dependency} />
-                {dependency.metadata.annotations?.['platform.taskapp.io/environment'] && (
-                  <> ({dependency.metadata.annotations['platform.taskapp.io/environment']})</>
-                )}
-              </li>
+              <DependencyRow
+                key={`${dependency.kind}:${dependency.metadata.namespace}/${dependency.metadata.name}`}
+                dependency={dependency}
+              />
             ))}
-          </ul>
-        </div>
+          </List>
+        </Box>
       ))}
     </InfoCard>
   );

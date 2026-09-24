@@ -8,10 +8,6 @@ import {
   InfoCard,
   Progress,
   ResponseErrorPanel,
-  StatusError,
-  StatusOK,
-  StatusPending,
-  StatusWarning,
   StructuredMetadataTable,
 } from '@backstage/core-components';
 import { useEntity } from '@backstage/plugin-catalog-react';
@@ -21,23 +17,7 @@ import { argoApplicationUrl, type Deployment } from './joinDeployments';
 import { useDeployments } from './useDeployments';
 import { LogsDialog } from './LogsDialog';
 import { DetailsDrawer } from './DetailsDrawer';
-
-const HealthStatus = ({ deployment }: { deployment: Deployment }) => {
-  if (!deployment.argoApplicationName) {
-    return <StatusPending>Pending</StatusPending>;
-  }
-  switch (deployment.healthStatus) {
-    case 'Healthy':
-      return <StatusOK>Healthy</StatusOK>;
-    case 'Degraded':
-    case 'Missing':
-      return <StatusError>{deployment.healthStatus}</StatusError>;
-    case 'Progressing':
-      return <StatusPending>Progressing</StatusPending>;
-    default:
-      return <StatusWarning>{deployment.healthStatus}</StatusWarning>;
-  }
-};
+import { HealthStatus } from '../platformUi';
 
 function formatTimestamp(value: string | null): string {
   if (!value) {
@@ -87,7 +67,10 @@ const EnvironmentCard = ({
       title={deployment.environment}
       action={
         <Box pt={2} pr={2}>
-          <HealthStatus deployment={deployment} />
+          <HealthStatus
+            status={deployment.healthStatus}
+            pending={!deployment.argoApplicationName}
+          />
         </Box>
       }
     >
