@@ -24,4 +24,22 @@ rules:
   - apiGroups: ["platform.taskapp.io"]
     resources: ["releases"]
     verbs: ["get", "list", "watch"]
+  # Environment Details summary (BACKSTAGE_PART9.md Part A) — workload,
+  # networking, binding and warning-event state for one component in one
+  # environment, selected by the platform.taskapp.io/* labels. Read-only.
+  # Deliberately NOT here: secrets (credentials are shown as a Secrets
+  # Manager path, never read) and pods/log (logs stay behind the Kubernetes
+  # plugin's owner-only permission — clusterrole-kubernetes.yaml).
+  - apiGroups: [""]
+    resources: ["pods", "services", "events"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["apps"]
+    resources: ["deployments", "replicasets"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["discovery.k8s.io"]
+    resources: ["endpointslices"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["external-secrets.io"]
+    resources: ["externalsecrets"]
+    verbs: ["get", "list", "watch"]
 {{- end }}

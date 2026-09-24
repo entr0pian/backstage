@@ -35,6 +35,15 @@ export class ReleaseVersionReader {
   }
 
   async listForComponent(component: string): Promise<ReleaseVersion[]> {
+    const all = await this.listAll();
+    return releaseVersionsForComponent(all, component, message =>
+      this.logger.warn(`release-version-reader: ${message}`),
+    );
+  }
+
+  // Every Release CR across the configured namespaces, unmapped — shared
+  // with the environment summary so both read Releases the same way.
+  async listAll(): Promise<ReleaseCustomResource[]> {
     const api = this.kubeConfig.makeApiClient(CustomObjectsApi);
     const all: ReleaseCustomResource[] = [];
 
@@ -61,8 +70,6 @@ export class ReleaseVersionReader {
       }
     }
 
-    return releaseVersionsForComponent(all, component, message =>
-      this.logger.warn(`release-version-reader: ${message}`),
-    );
+    return all;
   }
 }

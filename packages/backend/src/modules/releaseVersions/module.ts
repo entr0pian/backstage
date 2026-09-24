@@ -1,8 +1,10 @@
 import { coreServices, createBackendPlugin } from '@backstage/backend-plugin-api';
 import { ReleaseVersionReader } from './ReleaseVersionReader';
 import { createRouter } from './router';
+import { EnvironmentSummaryReader } from '../environmentSummary/EnvironmentSummaryReader';
 
-// Exposes GET /api/platform/releases/:component. Gated on
+// Exposes GET /api/platform/releases/:component and
+// GET /api/platform/environments/:component/:environment (BACKSTAGE_PART9.md). Gated on
 // platformCatalog.enabled/platformCatalog.namespaces — the same flag and
 // namespace list PlatformEntityProvider already uses, since both need the
 // same Kubernetes connectivity/RBAC (see
@@ -16,9 +18,11 @@ export const releaseVersionsModule = createBackendPlugin({
       deps: {
         config: coreServices.rootConfig,
         httpRouter: coreServices.httpRouter,
+        httpAuth: coreServices.httpAuth,
+        permissions: coreServices.permissions,
         logger: coreServices.logger,
       },
-      async init({ config, httpRouter, logger }) {
+      async init({ config, httpRouter, httpAuth, permissions, logger }) {
         if (!config.getOptionalBoolean('platformCatalog.enabled')) {
           logger.info(
             'platformCatalog.enabled is not true — Release Versions route not registered',
@@ -32,7 +36,14 @@ export const releaseVersionsModule = createBackendPlugin({
         // No addAuthPolicy: the default (user or service credentials
         // required) is what we want — the Deployments card calls this via
         // fetchApi, which already sends the signed-in user's token.
-        httpRouter.use(createRouter(reader));
+        httpRouter.use(
+          createRouter({
+            reader,
+            environments: new EnvironmentSummaryReader(reader, logger),
+            httpAuth,
+            permissions,
+          }),
+        );
       },
     });
   },

@@ -15,6 +15,17 @@ export interface ReleaseCustomResource {
     };
     environment?: string;
     version?: string;
+    // Read by the environment summary (modules/environmentSummary/), not
+    // by the version mapping below.
+    bindings?: Record<string, { enabled?: boolean; ref?: string } | undefined>;
+  };
+  status?: {
+    conditions?: {
+      type?: string;
+      status?: string;
+      reason?: string;
+      message?: string;
+    }[];
   };
 }
 

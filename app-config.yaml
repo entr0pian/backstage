@@ -27,8 +27,9 @@ app:
     # One Deployments tab (packages/app/src/modules/deployments) instead of
     # the Argo CD plugin's separate Deployment Lifecycle / Deployment
     # Summary tabs — see platform-architecture/BACKSTAGE_PART7.md. The
-    # plugin itself stays installed: its API, backend and lifecycle/drawer
-    # view are reused inside the Deployments tab.
+    # plugin stays installed for its backend (sync/health per Application,
+    # read by the Deployments tab); its frontend views are no longer used —
+    # per-environment Details replaced them (BACKSTAGE_PART9.md).
     - entity-content:backstage-community-argocd/deployment-lifecycle: false
     - entity-content:backstage-community-argocd/deployment-summary: false
     # Same for the Kubernetes plugin's generic tab: its API client, backend

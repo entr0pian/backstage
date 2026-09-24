@@ -25,18 +25,24 @@ export const LogsDialog = ({
   environment,
   open,
   onClose,
+  initialPodName,
 }: {
   component: string;
   environment: string;
   open: boolean;
   onClose: () => void;
+  // Preselect this pod (e.g. opened from a pod row in the Details drawer).
+  initialPodName?: string;
 }) => {
   const state = useWorkloadPods(component, environment, open);
   const [selectedPod, setSelectedPod] = useState<string>('');
   const [selectedContainer, setSelectedContainer] = useState<string>('');
 
   const pods = state.status === 'done' ? state.pods : [];
-  const pod = pods.find(p => podKey(p) === selectedPod) ?? pods[0];
+  const pod =
+    pods.find(p => podKey(p) === selectedPod) ??
+    pods.find(p => p.name === initialPodName) ??
+    pods[0];
   const container =
     pod?.containers.find(c => c === selectedContainer) ?? pod?.containers[0];
 

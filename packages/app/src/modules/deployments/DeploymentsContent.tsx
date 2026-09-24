@@ -1,7 +1,6 @@
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import Box from '@material-ui/core/Box';
 import Button from '@material-ui/core/Button';
-import Collapse from '@material-ui/core/Collapse';
 import Grid from '@material-ui/core/Grid';
 import Tooltip from '@material-ui/core/Tooltip';
 import {
@@ -16,12 +15,12 @@ import {
   StructuredMetadataTable,
 } from '@backstage/core-components';
 import { useEntity } from '@backstage/plugin-catalog-react';
-import { ArgocdDeploymentLifecycle } from '@backstage-community/plugin-argocd/legacy';
 import { kubernetesProxyPermission } from '@backstage/plugin-kubernetes-common';
 import { usePermission } from '@backstage/plugin-permission-react';
 import { argoApplicationUrl, type Deployment } from './joinDeployments';
 import { useDeployments } from './useDeployments';
 import { LogsDialog } from './LogsDialog';
+import { DetailsDrawer } from './DetailsDrawer';
 
 const HealthStatus = ({ deployment }: { deployment: Deployment }) => {
   if (!deployment.argoApplicationName) {
@@ -73,13 +72,13 @@ const EnvironmentCard = ({
   deployment,
   argocdUiUrl,
   logsAllowed,
-  onViewResources,
+  onViewDetails,
   onViewLogs,
 }: {
   deployment: Deployment;
   argocdUiUrl?: string;
   logsAllowed: boolean;
-  onViewResources: () => void;
+  onViewDetails: () => void;
   onViewLogs: () => void;
 }) => {
   const argoUrl = argoApplicationUrl(argocdUiUrl, deployment);
@@ -99,9 +98,9 @@ const EnvironmentCard = ({
             size="small"
             color="primary"
             disabled={!deployment.argoApplicationName}
-            onClick={onViewResources}
+            onClick={onViewDetails}
           >
-            View resources
+            Details
           </Button>
           <Tooltip
             title={logsAllowed ? '' : 'Sign in with GitHub to view logs'}
@@ -137,27 +136,20 @@ const EnvironmentCard = ({
 
 // Level 2 of BACKSTAGE_PART7.md's hierarchy: one card per environment,
 // listed from Release CRs (intent) and enriched with Argo CD delivery
-// state. Level 3 (resources) reuses the Argo CD plugin's own lifecycle
-// view + drawer unchanged — it's the only piece of it the package
-// exports; the drawer on its own isn't. Level 4 is the "Open in Argo CD"
-// deep link. Per-environment Logs (BACKSTAGE_PART8.md) open LogsDialog.
+// state. Level 3 is each environment's Details drawer (BACKSTAGE_PART9.md
+// Part A), which replaced the Argo CD plugin's embedded resource view.
+// Level 4 is the "Open in Argo CD" deep link. Per-environment Logs
+// (BACKSTAGE_PART8.md) open LogsDialog.
 export const DeploymentsContent = ({ argocdUiUrl }: { argocdUiUrl?: string }) => {
   const { entity } = useEntity();
   const state = useDeployments(entity.metadata.name);
-  const [resourcesOpen, setResourcesOpen] = useState(false);
-  const [logsEnvironment, setLogsEnvironment] = useState<string | null>(null);
+  const [detailsEnvironment, setDetailsEnvironment] = useState<string | null>(null);
+  const [logs, setLogs] = useState<{ environment: string; podName?: string } | null>(null);
   // Owner-only by permission policy (the Kubernetes plugin's permissions are
   // not on the guest allowlist) — the button just reflects that decision.
   const { allowed: logsAllowed } = usePermission({
     permission: kubernetesProxyPermission,
   });
-  const resourcesRef = useRef<HTMLDivElement>(null);
-
-  const showResources = () => {
-    setResourcesOpen(true);
-    // Let Collapse start expanding before scrolling to it.
-    setTimeout(() => resourcesRef.current?.scrollIntoView({ behavior: 'smooth' }), 0);
-  };
 
   if (state.status === 'loading') {
     return <Progress />;
@@ -183,28 +175,27 @@ export const DeploymentsContent = ({ argocdUiUrl }: { argocdUiUrl?: string }) =>
             deployment={deployment}
             argocdUiUrl={argocdUiUrl}
             logsAllowed={logsAllowed}
-            onViewResources={showResources}
-            onViewLogs={() => setLogsEnvironment(deployment.environment)}
+            onViewDetails={() => setDetailsEnvironment(deployment.environment)}
+            onViewLogs={() => setLogs({ environment: deployment.environment })}
           />
         </Grid>
       ))}
-      <Grid item xs={12}>
-        <div ref={resourcesRef}>
-          <Button size="small" onClick={() => setResourcesOpen(open => !open)}>
-            {resourcesOpen ? 'Hide resources' : 'Show resources'}
-          </Button>
-          <Collapse in={resourcesOpen} mountOnEnter>
-            <Box mt={2}>
-              <ArgocdDeploymentLifecycle />
-            </Box>
-          </Collapse>
-        </div>
-      </Grid>
+      <DetailsDrawer
+        component={entity.metadata.name}
+        deployment={
+          state.deployments.find(d => d.environment === detailsEnvironment) ?? null
+        }
+        argocdUiUrl={argocdUiUrl}
+        logsAllowed={logsAllowed}
+        onClose={() => setDetailsEnvironment(null)}
+        onViewLogs={(environment, podName) => setLogs({ environment, podName })}
+      />
       <LogsDialog
         component={entity.metadata.name}
-        environment={logsEnvironment ?? ''}
-        open={logsEnvironment !== null}
-        onClose={() => setLogsEnvironment(null)}
+        environment={logs?.environment ?? ''}
+        initialPodName={logs?.podName}
+        open={logs !== null}
+        onClose={() => setLogs(null)}
       />
     </Grid>
   );
