@@ -32,15 +32,31 @@ app:
     - entity-content:backstage-community-argocd/deployment-lifecycle: false
     - entity-content:backstage-community-argocd/deployment-summary: false
 
-    # Tab order: Overview | Deployments | TechDocs | APIs.
-    - entity-content:catalog/overview
     - entity-content:app/deployments:
         config:
           # Browser-reachable Argo CD UI for "Open in Argo CD" — the
           # port-forward for now; switch to the real domain once it exists.
           argocdUiUrl: https://localhost:9080
-    - entity-content:techdocs
-    - entity-content:api-docs/apis
+
+    # Tab order: Overview | Deployments | TechDocs | APIs. The entity page
+    # sorts tabs by content group in this order (TechDocs is in
+    # "documentation", APIs in "development", our Deployments tab in
+    # "deployment"); a group with a single tab renders as a plain tab.
+    - page:catalog/entity:
+        config:
+          groups:
+            - overview:
+                title: Overview
+            - deployment:
+                title: Deployments
+            - documentation:
+                title: Documentation
+            - development:
+                title: Development
+            - operation:
+                title: Operation
+            - observability:
+                title: Observability
 
 organization:
   name: My Company

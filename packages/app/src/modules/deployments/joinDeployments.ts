@@ -28,9 +28,9 @@ export interface ArgoApplication {
     destination?: { namespace?: string; server?: string };
   };
   status?: {
-    sync?: { status?: string; revision?: string };
+    sync?: { status?: string; revision?: string; revisions?: string[] };
     health?: { status?: string };
-    history?: { deployedAt?: string; revision?: string }[];
+    history?: { deployedAt?: string; revision?: string; revisions?: string[] }[];
     operationState?: { finishedAt?: string };
   };
 }
@@ -84,7 +84,16 @@ function deliveryFrom(app: ArgoApplication): ReturnType<typeof emptyDelivery> {
     argoApplicationNamespace: app.metadata?.namespace ?? null,
     syncStatus: app.status?.sync?.status ?? 'Unknown',
     healthStatus: app.status?.health?.status ?? 'Unknown',
-    revision: app.status?.sync?.revision ?? latest?.revision ?? null,
+    // Single-source Applications report sync.revision; multi-source ones
+    // (every taskapp-catalog Application: the service's own chart repo
+    // first, then application-repositories for the values file) report
+    // sync.revisions[] instead — the first entry is the service's commit.
+    revision:
+      app.status?.sync?.revision ??
+      app.status?.sync?.revisions?.[0] ??
+      latest?.revision ??
+      latest?.revisions?.[0] ??
+      null,
     lastDeployed:
       latest?.deployedAt ?? app.status?.operationState?.finishedAt ?? null,
     namespace: app.spec?.destination?.namespace ?? null,

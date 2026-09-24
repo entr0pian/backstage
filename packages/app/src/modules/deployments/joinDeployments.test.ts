@@ -51,6 +51,19 @@ describe('joinDeployments', () => {
     ]);
   });
 
+  it('takes the first source revision for a multi-source Application', () => {
+    const [result] = joinDeployments(
+      [{ environment: 'management', version: 'latest', releaseName: 'payments-management' }],
+      [
+        {
+          metadata: { name: 'payments-management', labels: { 'platform.taskapp.io/environment': 'management' } },
+          status: { sync: { status: 'Synced', revisions: ['1078eb1d0bef', 'f923e5ca9693'] } },
+        },
+      ],
+    );
+    expect(result.revision).toBe('1078eb1d0bef');
+  });
+
   it('falls back to operationState.finishedAt when there is no history', () => {
     const [result] = joinDeployments(
       [{ environment: 'dev', version: 'latest', releaseName: 'payments-dev' }],

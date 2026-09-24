@@ -4,6 +4,7 @@ import {
   EntityContentBlueprint,
 } from '@backstage/plugin-catalog-react/alpha';
 import type { Entity } from '@backstage/catalog-model';
+import { argocdPlugin } from '@backstage-community/plugin-argocd/legacy';
 import { z } from 'zod/v4';
 
 const isService = (entity: Entity) =>
@@ -36,6 +37,15 @@ const deploymentsContent = EntityContentBlueprint.makeWithOverrides({
     return originalFactory({
       path: 'deployments',
       title: 'Deployments',
+      // Tabs are ordered by group (page:catalog/entity's groups config in
+      // app-config.yaml), not by extension order; ungrouped tabs go last.
+      group: 'deployment',
+      // Mounts the Argo CD plugin's root route here. The plugin's lifecycle
+      // view (embedded under "View resources") is a routable extension on
+      // that route, and the Deployment Lifecycle tab that used to mount it
+      // is disabled — without this it throws "Routable extension component
+      // ... was not discovered in the app element tree".
+      routeRef: argocdPlugin.routes.root,
       filter: isService,
       loader: () =>
         import('./DeploymentsContent').then(m => (
