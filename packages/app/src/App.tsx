@@ -8,6 +8,7 @@ import { signInModule } from './modules/signIn';
 import { platformActionsModule } from './modules/platformActions';
 import { deploymentsModule } from './modules/deployments';
 import { dependenciesModule } from './modules/dependencies';
+import { databasesModule } from './modules/databases';
 
 export default createApp({
   features: [
@@ -17,6 +18,7 @@ export default createApp({
     platformActionsModule,
     deploymentsModule,
     dependenciesModule,
+    databasesModule,
     argocdPlugin,
     argocdTranslationsModule,
   ],

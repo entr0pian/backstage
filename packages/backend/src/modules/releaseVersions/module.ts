@@ -2,9 +2,11 @@ import { coreServices, createBackendPlugin } from '@backstage/backend-plugin-api
 import { ReleaseVersionReader } from './ReleaseVersionReader';
 import { createRouter } from './router';
 import { EnvironmentSummaryReader } from '../environmentSummary/EnvironmentSummaryReader';
+import { DatabaseSummaryReader } from '../databaseSummary/DatabaseSummaryReader';
 
 // Exposes GET /api/platform/releases/:component and
-// GET /api/platform/environments/:component/:environment (BACKSTAGE_PART9.md). Gated on
+// GET /api/platform/environments/:component/:environment and
+// GET /api/platform/databases/:namespace/:name (BACKSTAGE_PART9.md). Gated on
 // platformCatalog.enabled/platformCatalog.namespaces — the same flag and
 // namespace list PlatformEntityProvider already uses, since both need the
 // same Kubernetes connectivity/RBAC (see
@@ -40,6 +42,7 @@ export const releaseVersionsModule = createBackendPlugin({
           createRouter({
             reader,
             environments: new EnvironmentSummaryReader(reader, logger),
+            databases: new DatabaseSummaryReader(namespaces, reader, logger),
             httpAuth,
             permissions,
           }),

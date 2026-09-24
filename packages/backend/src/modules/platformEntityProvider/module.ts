@@ -39,7 +39,12 @@ export const platformEntityProviderModule = createBackendModule({
         });
 
         catalog.addEntityProvider(
-          new PlatformEntityProvider({ namespaces, logger, schedule }),
+          new PlatformEntityProvider({
+            namespaces,
+            gitopsRepoUrl: config.getOptionalString('platformCatalog.gitopsRepoUrl'),
+            logger,
+            schedule,
+          }),
         );
       },
     });

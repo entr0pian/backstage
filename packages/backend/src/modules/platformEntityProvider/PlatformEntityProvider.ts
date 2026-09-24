@@ -18,6 +18,7 @@ const PLURAL = 'databases';
 
 export interface PlatformEntityProviderOptions {
   namespaces: string[];
+  gitopsRepoUrl?: string;
   logger: LoggerService;
   schedule: SchedulerServiceTaskRunner;
 }
@@ -32,12 +33,14 @@ export interface PlatformEntityProviderOptions {
 export class PlatformEntityProvider implements EntityProvider {
   private connection?: EntityProviderConnection;
   private readonly namespaces: string[];
+  private readonly gitopsRepoUrl?: string;
   private readonly logger: LoggerService;
   private readonly schedule: SchedulerServiceTaskRunner;
   private readonly kubeConfig: KubeConfig;
 
   constructor(options: PlatformEntityProviderOptions) {
     this.namespaces = options.namespaces;
+    this.gitopsRepoUrl = options.gitopsRepoUrl;
     this.logger = options.logger;
     this.schedule = options.schedule;
 
@@ -77,6 +80,7 @@ export class PlatformEntityProvider implements EntityProvider {
     }
 
     const api = this.kubeConfig.makeApiClient(CustomObjectsApi);
+    const owners = await this.componentOwners(api);
     const collected: Array<{ entity: Record<string, unknown> }> = [];
 
     // A namespace's list call failing (API server hiccup, RBAC drift, ...)
@@ -96,7 +100,10 @@ export class PlatformEntityProvider implements EntityProvider {
         const items = (res as { items?: DatabaseCustomResource[] }).items ?? [];
 
         for (const item of items) {
-          const mapped = mapDatabaseToEntity(item);
+          const mapped = mapDatabaseToEntity(item, {
+            owner: owners.get(item.spec?.componentRef?.name ?? ''),
+            gitopsRepoUrl: this.gitopsRepoUrl,
+          });
           if ('error' in mapped) {
             this.logger.warn(`${this.getProviderName()}: ${mapped.error}`);
             continue;
@@ -122,5 +129,32 @@ export class PlatformEntityProvider implements EntityProvider {
     this.logger.info(
       `${this.getProviderName()}: published ${collected.length} Database entit${collected.length === 1 ? 'y' : 'ies'} across ${this.namespaces.length} namespace(s)`,
     );
+  }
+
+  // Component name -> its CR's spec.owner, cluster-wide (Components live in
+  // their own namespace, not the per-environment ones). A failure here only
+  // costs owner accuracy (falls back to user:guest in the mapper) — it must
+  // not skip the refresh, unlike a failed Database list.
+  private async componentOwners(api: CustomObjectsApi): Promise<Map<string, string>> {
+    const owners = new Map<string, string>();
+    try {
+      const res = await api.listClusterCustomObject({
+        group: 'platform.taskapp.io',
+        version: 'v1alpha1',
+        plural: 'components',
+      });
+      const items =
+        (res as { items?: { metadata?: { name?: string }; spec?: { owner?: string } }[] }).items ?? [];
+      for (const c of items) {
+        if (c.metadata?.name && c.spec?.owner) {
+          owners.set(c.metadata.name, c.spec.owner);
+        }
+      }
+    } catch (err) {
+      this.logger.warn(
+        `${this.getProviderName()}: failed to list components.platform.taskapp.io — Database owners fall back to user:guest (${err instanceof Error ? err.message : String(err)})`,
+      );
+    }
+    return owners;
   }
 }

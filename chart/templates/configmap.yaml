@@ -55,6 +55,9 @@ data:
     platformCatalog:
       enabled: true
       namespaces: {{ .Values.platformCatalog.namespaces | toJson }}
+      {{- with .Values.platformCatalog.gitopsRepoUrl }}
+      gitopsRepoUrl: {{ . | quote }}
+      {{- end }}
     {{- end }}
     {{- if .Values.deployments.enabled }}
     # @backstage-community/plugin-argocd-backend's own config contract (see

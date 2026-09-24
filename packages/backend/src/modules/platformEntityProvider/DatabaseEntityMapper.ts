@@ -43,8 +43,20 @@ export function databaseEntityName(
   return `${kubernetesNamespace}-${crName}`;
 }
 
+export interface MapDatabaseOptions {
+  // The owning Component CR's spec.owner (e.g. "payments-team") — the team
+  // that owns the service owns its database. Falls back to user:guest when
+  // the Component can't be found, so a Database is never dropped for it.
+  owner?: string;
+  // Base URL of the GitOps repo that defines platform CRs, e.g.
+  // https://github.com/entr0pian/application-repositories — adds a link to
+  // the environment folder the Database CR is defined in.
+  gitopsRepoUrl?: string;
+}
+
 export function mapDatabaseToEntity(
   database: DatabaseCustomResource,
+  options: MapDatabaseOptions = {},
 ): MappedEntity | MapperError {
   const crName = database.metadata?.name;
   const crNamespace = database.metadata?.namespace;
@@ -76,6 +88,10 @@ export function mapDatabaseToEntity(
       kind: 'Resource',
       metadata: {
         name: entityName,
+        // The CR's own name for display — entityName stays
+        // "<namespace>-<crName>" so the same database in two environments
+        // never collides.
+        title: crName,
         namespace: 'default',
         description: `Database "${database.spec?.dbName ?? crName}" for component ${componentName} (${crNamespace})`,
         annotations: {
@@ -83,11 +99,25 @@ export function mapDatabaseToEntity(
           'backstage.io/managed-by-origin-location': locationRef,
           'platform.taskapp.io/environment': crNamespace,
           'platform.taskapp.io/kubernetes-namespace': crNamespace,
+          'platform.taskapp.io/database-name': crName,
         },
+        labels: {
+          'platform.taskapp.io/component': componentName,
+        },
+        ...(options.gitopsRepoUrl
+          ? {
+              links: [
+                {
+                  url: `${options.gitopsRepoUrl.replace(/\/+$/, '')}/tree/main/platform/environments/${crNamespace}`,
+                  title: 'Definition in Git',
+                },
+              ],
+            }
+          : {}),
       },
       spec: {
         type: 'database',
-        owner: 'user:guest',
+        owner: options.owner ?? 'user:guest',
         // Standard Backstage relation — Backstage derives the inverse
         // (dependsOn) on the Component automatically. This is the ONLY
         // link between the two; nothing here touches the Component's own

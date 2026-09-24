@@ -81,6 +81,9 @@ platformCatalog:
     - dev
     - prod
     - management
+  # GitOps repo defining platform CRs; Database pages link to
+  # <repo>/tree/main/platform/environments/<env>. Empty: no link.
+  gitopsRepoUrl: "https://github.com/entr0pian/application-repositories"
 
 kubernetes:
   # Turns on @backstage/plugin-kubernetes-backend against the cluster

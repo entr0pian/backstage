@@ -42,4 +42,21 @@ rules:
   - apiGroups: ["external-secrets.io"]
     resources: ["externalsecrets"]
     verbs: ["get", "list", "watch"]
+  # Database page (BACKSTAGE_PART9.md Part B) + Database entity owners.
+  # components: to take a Database entity's owner from its Component CR.
+  - apiGroups: ["platform.taskapp.io"]
+    resources: ["components"]
+    verbs: ["get", "list", "watch"]
+  # Exactly the managed-resource kinds the database composition creates
+  # whose status is safe to read — keep in step with READABLE_KINDS in
+  # packages/backend/src/modules/databaseSummary/DatabaseSummary.ts.
+  # Deliberately NOT objects.kubernetes.m.crossplane.io: the composition's
+  # connection-secret Object embeds the full Secret (password included) in
+  # its spec and status, so reading it would mean reading credentials.
+  - apiGroups: ["rds.aws.m.upbound.io"]
+    resources: ["instances", "subnetgroups"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["ec2.aws.m.upbound.io"]
+    resources: ["securitygroups", "securitygrouprules"]
+    verbs: ["get", "list", "watch"]
 {{- end }}

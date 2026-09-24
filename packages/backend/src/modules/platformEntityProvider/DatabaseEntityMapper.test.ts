@@ -87,4 +87,44 @@ describe('mapDatabaseToEntity', () => {
       databaseEntityName('prod', 'checkout-db'),
     );
   });
+
+  it('shows the CR name as title, labels the component, and keeps the unique entity name', () => {
+    const { entity } = mapDatabaseToEntity({
+      metadata: { name: 'payments-db', namespace: 'management' },
+      spec: { componentRef: { name: 'payments' } },
+    }) as { entity: Record<string, any> };
+    expect(entity.metadata.name).toBe('management-payments-db');
+    expect(entity.metadata.title).toBe('payments-db');
+    expect(entity.metadata.labels).toEqual({ 'platform.taskapp.io/component': 'payments' });
+    expect(entity.metadata.annotations['platform.taskapp.io/database-name']).toBe('payments-db');
+  });
+
+  it('takes the owner from the owning Component, falling back to user:guest', () => {
+    const database = {
+      metadata: { name: 'payments-db', namespace: 'management' },
+      spec: { componentRef: { name: 'payments' } },
+    };
+    const owned = mapDatabaseToEntity(database, { owner: 'payments-team' }) as { entity: Record<string, any> };
+    expect(owned.entity.spec.owner).toBe('payments-team');
+    const unowned = mapDatabaseToEntity(database) as { entity: Record<string, any> };
+    expect(unowned.entity.spec.owner).toBe('user:guest');
+  });
+
+  it('links to the environment folder defining it, only when a GitOps repo is configured', () => {
+    const database = {
+      metadata: { name: 'payments-db', namespace: 'management' },
+      spec: { componentRef: { name: 'payments' } },
+    };
+    const linked = mapDatabaseToEntity(database, {
+      gitopsRepoUrl: 'https://github.com/entr0pian/application-repositories/',
+    }) as { entity: Record<string, any> };
+    expect(linked.entity.metadata.links).toEqual([
+      {
+        url: 'https://github.com/entr0pian/application-repositories/tree/main/platform/environments/management',
+        title: 'Definition in Git',
+      },
+    ]);
+    const unlinked = mapDatabaseToEntity(database) as { entity: Record<string, any> };
+    expect(unlinked.entity.metadata.links).toBeUndefined();
+  });
 });
