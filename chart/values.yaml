@@ -12,6 +12,12 @@ service:
 ingress:
   enabled: false
   className: nginx
+  # Hostname the Ingress rule matches (e.g. backstage.example.com) - should
+  # be baseUrl's host. Empty matches any host.
+  host: ""
+  # Controller-specific settings (e.g. alb.ingress.kubernetes.io/*), passed
+  # through verbatim.
+  annotations: {}
   path: /
   pathType: Prefix
 
