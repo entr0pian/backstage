@@ -99,7 +99,7 @@ export const DatabaseCard = () => {
               database · {d.namespace}
               {componentLink && (
                 <>
-                  {' · used by '}
+                  {' · used by\u00a0'}
                   <Link to={componentLink}>{d.component}</Link>
                 </>
               )}

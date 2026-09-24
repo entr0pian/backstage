@@ -63,6 +63,11 @@ const Muted = ({ children }: { children: ReactNode }) => (
   </Typography>
 );
 
+// Status icon + its text on one line (a bare <StatusOK /> renders the
+// icon as its own block, pushing the text to the next line).
+const Ok = ({ ok, children }: { ok: boolean; children: ReactNode }) =>
+  ok ? <StatusOK>{children}</StatusOK> : <StatusError>{children}</StatusError>;
+
 const PodStatusIcon = ({ ready, failing }: { ready: boolean; failing: boolean }) => {
   if (ready) return <StatusOK />;
   if (failing) return <StatusError />;
@@ -164,10 +169,11 @@ const NetworkingSection = ({ details }: { details: EnvironmentDetails }) => (
     )}
     {details.networking.services.map(svc => (
       <Line key={`${svc.namespace}/${svc.name}`}>
-        {svc.readyEndpoints > 0 ? <StatusOK /> : <StatusError />} Service{' '}
-        <b>{svc.name}</b> {svc.ports.map(p => `:${p.port}`).join(', ')} →{' '}
-        {svc.readyEndpoints} ready endpoint{svc.readyEndpoints === 1 ? '' : 's'}
-        {svc.notReadyEndpoints > 0 ? `, ${svc.notReadyEndpoints} not ready` : ''}
+        <Ok ok={svc.readyEndpoints > 0}>
+          Service <b>{svc.name}</b> {svc.ports.map(p => `:${p.port}`).join(', ')} →{' '}
+          {svc.readyEndpoints} ready endpoint{svc.readyEndpoints === 1 ? '' : 's'}
+          {svc.notReadyEndpoints > 0 ? `, ${svc.notReadyEndpoints} not ready` : ''}
+        </Ok>
       </Line>
     ))}
     <Line>
@@ -188,17 +194,19 @@ const BindingsSection = ({ details }: { details: EnvironmentDetails }) => {
       {details.bindings.map(b => (
         <Box key={b.name} mb={2}>
           <Line>
-            {b.problem ? <StatusError /> : <StatusOK />} <b>{b.name}</b>
-            {b.externalSecret && (
-              <>
-                {' '}
-                → {b.externalSecret.name}{' '}
-                <Muted>
-                  {b.externalSecret.reason ?? 'no status yet'}
-                  {b.externalSecret.refreshTime ? ` · refreshed ${time(b.externalSecret.refreshTime)}` : ''}
-                </Muted>
-              </>
-            )}
+            <Ok ok={!b.problem}>
+              <b>{b.name}</b>
+              {b.externalSecret && (
+                <>
+                  {' '}
+                  → {b.externalSecret.name}{' '}
+                  <Muted>
+                    {b.externalSecret.reason ?? 'no status yet'}
+                    {b.externalSecret.refreshTime ? ` · refreshed ${time(b.externalSecret.refreshTime)}` : ''}
+                  </Muted>
+                </>
+              )}
+            </Ok>
           </Line>
           <Box ml={4}>
             {b.externalSecret?.remoteKey && (
