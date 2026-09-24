@@ -31,6 +31,11 @@ app:
     # view are reused inside the Deployments tab.
     - entity-content:backstage-community-argocd/deployment-lifecycle: false
     - entity-content:backstage-community-argocd/deployment-summary: false
+    # Same for the Kubernetes plugin's generic tab: its API client, backend
+    # and PodLogs are reused by the Deployments tab's per-environment Logs
+    # (BACKSTAGE_PART8.md) — a second, cluster/namespace-oriented tab would
+    # break the component -> environment view.
+    - entity-content:kubernetes/kubernetes: false
 
     - entity-content:app/deployments:
         config:

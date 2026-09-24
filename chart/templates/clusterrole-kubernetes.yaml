@@ -1,0 +1,38 @@
+{{- if .Values.kubernetes.enabled }}
+# Read-only access for @backstage/plugin-kubernetes-backend — exactly what the
+# Deployments tab's Logs dialog needs to find a component's pods and read
+# their logs (BACKSTAGE_PART8.md), and nothing more: no exec, no port-forward,
+# no Secrets/ConfigMaps, no writes. Separate from clusterrole.yaml (platform
+# CRs) so each can be switched off on its own.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ .Release.Name }}-kubernetes-read
+  labels:
+    app: {{ .Chart.Name }}
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "services"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["pods/log"]
+    verbs: ["get"]
+  - apiGroups: ["apps"]
+    resources: ["deployments", "replicasets"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ .Release.Name }}-kubernetes-read
+  labels:
+    app: {{ .Chart.Name }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ .Release.Name }}-kubernetes-read
+subjects:
+  - kind: ServiceAccount
+    name: {{ .Release.Name }}
+    namespace: {{ .Release.Namespace }}
+{{- end }}

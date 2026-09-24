@@ -1,6 +1,7 @@
 import { AuthorizeResult } from '@backstage/plugin-permission-common';
 import { catalogPermissions } from '@backstage/plugin-catalog-common/alpha';
 import { scaffolderPermissions } from '@backstage/plugin-scaffolder-common/alpha';
+import { kubernetesPermissions } from '@backstage/plugin-kubernetes-common';
 import type { PolicyQueryUser } from '@backstage/plugin-permission-node';
 import type { Permission } from '@backstage/plugin-permission-common';
 import {
@@ -24,6 +25,7 @@ const guest = userWithRef('user:development/guest');
 const allPermissions: Permission[] = [
   ...catalogPermissions,
   ...scaffolderPermissions,
+  ...kubernetesPermissions,
 ];
 
 describe('PortfolioPermissionPolicy', () => {
@@ -48,6 +50,16 @@ describe('PortfolioPermissionPolicy', () => {
       );
     },
   );
+
+  // Logs on the Deployments tab go through the Kubernetes plugin's proxy —
+  // owner only (BACKSTAGE_PART8.md). Guards against someone later adding
+  // these to the guest allowlist without meaning to.
+  it('denies the guest every Kubernetes permission (pod specs, logs, proxy)', async () => {
+    for (const permission of kubernetesPermissions) {
+      const decision = await policy.handle({ permission }, guest);
+      expect(decision.result).toBe(AuthorizeResult.DENY);
+    }
+  });
 
   it('denies the guest template execution and location registration', async () => {
     for (const name of ['scaffolder.task.create', 'catalog.location.create']) {

@@ -75,3 +75,21 @@ data:
               url: ${ARGOCD_URL}
               token: ${ARGOCD_TOKEN}
     {{- end }}
+    {{- if .Values.kubernetes.enabled }}
+    # @backstage/plugin-kubernetes-backend, read-only against the cluster
+    # Backstage itself runs on — powers the Deployments tab's per-environment
+    # Logs (BACKSTAGE_PART8.md). No token configured: the serviceAccount auth
+    # provider then reads this pod's own projected ServiceAccount token on
+    # every request, so there's no Secret to manage and rotation is free.
+    # What that ServiceAccount may do is limited by clusterrole-kubernetes.yaml.
+    kubernetes:
+      serviceLocatorMethod:
+        type: multiTenant
+      clusterLocatorMethods:
+        - type: config
+          clusters:
+            - name: {{ .Values.kubernetes.clusterName }}
+              url: https://kubernetes.default.svc
+              authProvider: serviceAccount
+              caFile: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+    {{- end }}

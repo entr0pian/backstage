@@ -82,6 +82,18 @@ platformCatalog:
     - prod
     - management
 
+kubernetes:
+  # Turns on @backstage/plugin-kubernetes-backend against the cluster
+  # Backstage runs on, plus a read-only ClusterRole for its ServiceAccount
+  # (pods, pods/log, deployments, replicasets, services — no exec, no
+  # Secrets, no writes). Powers the Deployments tab's Logs dialog — see
+  # BACKSTAGE_PART8.md. Who may use it is decided separately, by the
+  # backend permission policy (owner only).
+  enabled: false
+  # The name Backstage shows/uses for this cluster; any value works, it
+  # just has to be stable.
+  clusterName: management
+
 resources: {}
 
 nodeSelector: {}
