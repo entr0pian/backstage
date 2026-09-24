@@ -64,9 +64,13 @@ const Muted = ({ children }: { children: ReactNode }) => (
 );
 
 // Status icon + its text on one line (a bare <StatusOK /> renders the
-// icon as its own block, pushing the text to the next line).
-const Ok = ({ ok, children }: { ok: boolean; children: ReactNode }) =>
-  ok ? <StatusOK>{children}</StatusOK> : <StatusError>{children}</StatusError>;
+// icon as its own block, pushing the text to the next line). The inner
+// <span> matters: the status components lay children out with flexbox,
+// which drops the whitespace between separate text/element children.
+const Ok = ({ ok, children }: { ok: boolean; children: ReactNode }) => {
+  const content = <span>{children}</span>;
+  return ok ? <StatusOK>{content}</StatusOK> : <StatusError>{content}</StatusError>;
+};
 
 const PodStatusIcon = ({ ready, failing }: { ready: boolean; failing: boolean }) => {
   if (ready) return <StatusOK />;
