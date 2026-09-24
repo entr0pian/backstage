@@ -4,13 +4,13 @@ import {
 } from './ReleaseVersionMapper';
 
 describe('mapReleaseToVersion', () => {
-  it('maps a well-formed Release to an environment/version pair', () => {
+  it('maps a well-formed Release to its environment, version and name', () => {
     const result = mapReleaseToVersion({
       metadata: { name: 'payments-dev', namespace: 'dev' },
       spec: { componentRef: { name: 'payments' }, environment: 'dev', version: 'latest' },
     });
     expect('error' in result).toBe(false);
-    expect(result).toEqual({ environment: 'dev', version: 'latest' });
+    expect(result).toEqual({ environment: 'dev', version: 'latest', releaseName: 'payments-dev' });
   });
 
   it('displays version exactly as configured, never resolving "latest"', () => {
@@ -18,7 +18,7 @@ describe('mapReleaseToVersion', () => {
       metadata: { name: 'payments-prod', namespace: 'prod' },
       spec: { componentRef: { name: 'payments' }, environment: 'prod', version: 'v1.2.3' },
     });
-    expect(result).toEqual({ environment: 'prod', version: 'v1.2.3' });
+    expect(result).toEqual({ environment: 'prod', version: 'v1.2.3', releaseName: 'payments-prod' });
   });
 
   it('errors when spec.componentRef.name is missing', () => {
@@ -47,7 +47,7 @@ describe('mapReleaseToVersion', () => {
       metadata: { name: 'payments-dev', namespace: 'dev' },
       spec: { componentRef: { name: 'payments' }, environment: 'dev' },
     });
-    expect(result).toEqual({ environment: 'dev', version: '' });
+    expect(result).toEqual({ environment: 'dev', version: '', releaseName: 'payments-dev' });
   });
 });
 
@@ -70,8 +70,8 @@ describe('releaseVersionsForComponent', () => {
   it('returns every environment for the requested component, independently', () => {
     const result = releaseVersionsForComponent(releases, 'payments');
     expect(result).toEqual([
-      { environment: 'dev', version: 'latest' },
-      { environment: 'prod', version: 'v1.2.3' },
+      { environment: 'dev', version: 'latest', releaseName: 'payments-dev' },
+      { environment: 'prod', version: 'v1.2.3', releaseName: 'payments-prod' },
     ]);
   });
 
@@ -79,7 +79,7 @@ describe('releaseVersionsForComponent', () => {
     const result = releaseVersionsForComponent(releases, 'payments');
     expect(result.some(r => r.environment === 'dev' && r.version !== 'latest')).toBe(false);
     expect(releaseVersionsForComponent(releases, 'checkout')).toEqual([
-      { environment: 'dev', version: 'latest' },
+      { environment: 'dev', version: 'latest', releaseName: 'checkout-dev' },
     ]);
   });
 
@@ -110,8 +110,8 @@ describe('releaseVersionsForComponent', () => {
     const onError = jest.fn();
     const result = releaseVersionsForComponent(withMalformed, 'payments', onError);
     expect(result).toEqual([
-      { environment: 'dev', version: 'latest' },
-      { environment: 'prod', version: 'v1.2.3' },
+      { environment: 'dev', version: 'latest', releaseName: 'payments-dev' },
+      { environment: 'prod', version: 'v1.2.3', releaseName: 'payments-prod' },
     ]);
     expect(onError).toHaveBeenCalledTimes(1);
   });

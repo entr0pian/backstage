@@ -1,4 +1,4 @@
-// Pure transformation layer: Kubernetes Release CR -> {environment, version}.
+// Pure transformation layer: Kubernetes Release CR -> {environment, version, releaseName}.
 // No I/O here — see ReleaseVersionReader.ts for the Kubernetes client and
 // listing loop. Deliberately does not touch Argo CD or sync/health at all —
 // see BACKSTAGE_PART5.md's "Architecture" section: this is one of two
@@ -21,6 +21,7 @@ export interface ReleaseCustomResource {
 export interface ReleaseVersion {
   environment: string;
   version: string;
+  releaseName: string;
 }
 
 export interface MapperError {
@@ -57,7 +58,7 @@ export function mapReleaseToVersion(
   // SHA/tag/digest here.
   const version = release.spec?.version ?? '';
 
-  return { environment, version };
+  return { environment, version, releaseName: crName };
 }
 
 // Filters a mixed-component list of Release CRs down to one component's
