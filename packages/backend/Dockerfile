@@ -60,7 +60,7 @@ RUN tar xzf skeleton.tar.gz && rm skeleton.tar.gz
 RUN --mount=type=cache,target=/home/node/.cache/yarn,sharing=locked,uid=1000,gid=1000 \
     yarn workspaces focus --all --production && rm -rf "$(yarn cache clean)"
 
-# This will include the examples, if you don't need these simply remove this line
+# Guest User/Group (examples/org.yaml) that guest sign-in resolves to
 COPY --chown=node:node examples ./examples
 
 # Onboard Service template — see BACKSTAGE.md (platform-architecture repo)

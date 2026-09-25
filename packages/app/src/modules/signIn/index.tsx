@@ -16,6 +16,7 @@ const signInPage = SignInPageBlueprint.make({
       return props => (
         <SignInPage
           {...props}
+          title="gerodimos.dev platform"
           providers={[
             'guest',
             {
