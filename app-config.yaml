@@ -40,9 +40,10 @@ app:
 
     - entity-content:app/deployments:
         config:
-          # Browser-reachable Argo CD UI for "Open in Argo CD" — the
-          # port-forward for now; switch to the real domain once it exists.
-          argocdUiUrl: https://localhost:9080
+          # Browser-reachable Argo CD UI for "Open in Argo CD". Public, and
+          # visitors land in it read-only without logging in (anonymous
+          # role:readonly, see bootstrap-cluster/install-argocd values.yaml).
+          argocdUiUrl: https://argocd.gerodimos.dev
 
     # Tab order: Overview | Deployments | TechDocs | APIs. The entity page
     # sorts tabs by content group in this order (TechDocs is in
