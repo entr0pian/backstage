@@ -38,13 +38,6 @@ app:
     # break the component -> environment view.
     - entity-content:kubernetes/kubernetes: false
 
-    - entity-content:app/deployments:
-        config:
-          # Browser-reachable Argo CD UI for "Open in Argo CD". Public, and
-          # visitors land in it read-only without logging in (anonymous
-          # role:readonly, see bootstrap-cluster/install-argocd values.yaml).
-          argocdUiUrl: https://argocd.gerodimos.dev
-
     # Tab order: Overview | Deployments | TechDocs | APIs. The entity page
     # sorts tabs by content group in this order (TechDocs is in
     # "documentation", APIs in "development", our Deployments tab in
@@ -241,6 +234,15 @@ kubernetes:
 # Off by default so local `yarn start` needs no cluster; the deployed chart
 # turns this on via app-config.cluster.yaml (see chart/values.yaml's
 # platformCatalog block).
+# Settings for the platform's own frontend views (schema:
+# packages/app/config.d.ts).
+platform:
+  # Browser-reachable Argo CD UI for every "Open in Argo CD" link (Deployments
+  # tab, Details drawer, Database page). Public, and visitors land in it
+  # read-only without logging in (anonymous role:readonly, see
+  # bootstrap-cluster/install-argocd values.yaml).
+  argocdUiUrl: https://argocd.gerodimos.dev
+
 platformCatalog:
   enabled: false
   namespaces: []

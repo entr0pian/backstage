@@ -1,4 +1,5 @@
 import Box from '@material-ui/core/Box';
+import Button from '@material-ui/core/Button';
 import Grid from '@material-ui/core/Grid';
 import Typography from '@material-ui/core/Typography';
 import {
@@ -17,6 +18,7 @@ import {
 import { useRouteRef } from '@backstage/core-plugin-api';
 import { entityRouteRef, useEntity } from '@backstage/plugin-catalog-react';
 import { useDatabaseDetails, type DatabaseDetails } from './useDatabaseDetails';
+import { argoApplicationUrl, useArgoApplication, useArgocdUiUrl } from '../platformUi/argocd';
 
 type Resource = DatabaseDetails['resources'][number];
 
@@ -62,6 +64,12 @@ export const DatabaseCard = () => {
   const namespace = annotations['platform.taskapp.io/kubernetes-namespace'] ?? '';
   const name = annotations['platform.taskapp.io/database-name'] ?? entity.metadata.title ?? '';
   const state = useDatabaseDetails(namespace, name);
+  // The Application delivering this Database CR, found by the same
+  // platform.taskapp.io/* label contract as the Deployments tab.
+  const argoApp = useArgoApplication(
+    namespace && name ? { type: 'database', environment: namespace, name } : null,
+  );
+  const argoUrl = argoApplicationUrl(useArgocdUiUrl(), argoApp);
 
   if (state.status === 'loading') return <Progress />;
   if (state.status === 'error') return <ResponseErrorPanel error={state.error} />;
@@ -106,8 +114,19 @@ export const DatabaseCard = () => {
             </>
           }
           action={
-            <Box pt={2} pr={2}>
+            <Box pt={2} pr={2} display="flex" alignItems="center" style={{ gap: 16 }}>
               <HeaderStatus d={d} />
+              {argoUrl && (
+                <Button
+                  size="small"
+                  color="primary"
+                  href={argoUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Open in Argo CD
+                </Button>
+              )}
             </Box>
           }
         >

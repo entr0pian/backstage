@@ -17,7 +17,8 @@ import {
 import { useRouteRef } from '@backstage/core-plugin-api';
 import { entityRouteRef } from '@backstage/plugin-catalog-react';
 import type { ReactNode } from 'react';
-import { argoApplicationUrl, type Deployment } from './joinDeployments';
+import { type Deployment } from './joinDeployments';
+import { argoApplicationUrl } from '../platformUi/argocd';
 import { useEnvironmentDetails, type EnvironmentDetails } from './useEnvironmentDetails';
 import { shortVersion } from '../platformUi';
 
@@ -302,7 +303,12 @@ export const DetailsDrawer = ({
   onViewLogs: (environment: string, podName?: string) => void;
 }) => {
   const state = useEnvironmentDetails(component, deployment?.environment ?? null);
-  const argoUrl = deployment ? argoApplicationUrl(argocdUiUrl, deployment) : null;
+  const argoUrl = deployment
+    ? argoApplicationUrl(argocdUiUrl, {
+        name: deployment.argoApplicationName,
+        namespace: deployment.argoApplicationNamespace,
+      })
+    : null;
 
   return (
     <Drawer anchor="right" open={deployment !== null} onClose={onClose}>

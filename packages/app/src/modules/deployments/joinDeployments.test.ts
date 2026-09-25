@@ -1,4 +1,4 @@
-import { argoApplicationUrl, joinDeployments } from './joinDeployments';
+import { joinDeployments } from './joinDeployments';
 
 const noDelivery = {
   argoApplicationName: null,
@@ -163,28 +163,5 @@ describe('joinDeployments', () => {
       [],
     );
     expect(result.map(d => d.environment)).toEqual(['dev', 'prod']);
-  });
-});
-
-describe('argoApplicationUrl', () => {
-  it('builds an Argo CD UI deep link from the configured UI URL', () => {
-    expect(
-      argoApplicationUrl('https://localhost:9080/', {
-        argoApplicationName: 'payments-management',
-        argoApplicationNamespace: 'argocd',
-      }),
-    ).toBe('https://localhost:9080/applications/argocd/payments-management');
-  });
-
-  it('returns null without a UI URL or without an Argo Application', () => {
-    expect(
-      argoApplicationUrl(undefined, { argoApplicationName: 'x', argoApplicationNamespace: 'argocd' }),
-    ).toBeNull();
-    expect(
-      argoApplicationUrl('https://localhost:9080', {
-        argoApplicationName: null,
-        argoApplicationNamespace: null,
-      }),
-    ).toBeNull();
   });
 });

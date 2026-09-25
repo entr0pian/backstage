@@ -10,6 +10,8 @@
 // Application naming convention never touches this file, since nothing
 // here reads an Application's name to decide what it belongs to.
 
+import { PLATFORM_LABELS } from '../platformUi/argocd';
+
 export interface ReleaseVersion {
   environment: string;
   version: string;
@@ -51,7 +53,7 @@ export interface Deployment {
   server: string | null;
 }
 
-const ENVIRONMENT_LABEL = 'platform.taskapp.io/environment';
+const ENVIRONMENT_LABEL = PLATFORM_LABELS.environment;
 
 function emptyDelivery(): Pick<
   Deployment,
@@ -141,19 +143,4 @@ export function joinDeployments(
   return [...byEnvironment.values()].sort((a, b) =>
     a.environment.localeCompare(b.environment),
   );
-}
-
-// Deep link into the Argo CD UI for one Application. uiUrl is the
-// browser-reachable Argo CD address (extension config), not the in-cluster
-// URL argocd-backend talks to.
-export function argoApplicationUrl(
-  uiUrl: string | undefined,
-  deployment: Pick<Deployment, 'argoApplicationName' | 'argoApplicationNamespace'>,
-): string | null {
-  if (!uiUrl || !deployment.argoApplicationName) {
-    return null;
-  }
-  const base = uiUrl.replace(/\/+$/, '');
-  const namespace = deployment.argoApplicationNamespace ?? 'argocd';
-  return `${base}/applications/${encodeURIComponent(namespace)}/${encodeURIComponent(deployment.argoApplicationName)}`;
 }

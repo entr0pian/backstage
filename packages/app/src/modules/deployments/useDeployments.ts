@@ -6,8 +6,7 @@ import {
   type Deployment,
   type ReleaseVersion,
 } from './joinDeployments';
-
-const ARGO_SELECTOR_LABELS = 'platform.taskapp.io/type=service';
+import { fetchArgoApplications } from '../platformUi/argocd';
 
 export type DeploymentsState =
   | { status: 'loading' }
@@ -32,18 +31,16 @@ export function useDeployments(component: string): DeploymentsState {
     (async () => {
       setState({ status: 'loading' });
       try {
-        const [platformBaseUrl, argocdBaseUrl] = await Promise.all([
-          discoveryApi.getBaseUrl('platform'),
-          discoveryApi.getBaseUrl('backstage-community-argocd'),
-        ]);
+        const platformBaseUrl = await discoveryApi.getBaseUrl('platform');
 
-        const selector = `platform.taskapp.io/component=${component},${ARGO_SELECTOR_LABELS}`;
-
-        const [releasesRes, argoRes] = await Promise.all([
+        // The component's workload Applications, found by the shared
+        // platform.taskapp.io/* label contract (see platformUi/argocd.ts).
+        const [releasesRes, argo] = await Promise.all([
           fetchApi.fetch(`${platformBaseUrl}/releases/${encodeURIComponent(component)}`),
-          fetchApi.fetch(
-            `${argocdBaseUrl}/argoInstance/primary/applications/selector/${encodeURIComponent(selector)}`,
-          ),
+          fetchArgoApplications<ArgoApplication>(discoveryApi, fetchApi, {
+            component,
+            type: 'service',
+          }),
         ]);
 
         if (!releasesRes.ok) {
@@ -55,11 +52,7 @@ export function useDeployments(component: string): DeploymentsState {
         // show Release-derived deployments with Sync/Health as Unknown
         // rather than losing the whole view, per BACKSTAGE_PART5.md's
         // "Argo unavailable" behavior, carried over here.
-        let argoApps: ArgoApplication[] = [];
-        if (argoRes.ok) {
-          const argoBody: { items?: ArgoApplication[] } = await argoRes.json();
-          argoApps = argoBody.items ?? [];
-        }
+        const argoApps = argo.items;
 
         if (!cancelled) {
           setState({

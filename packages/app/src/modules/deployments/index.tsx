@@ -4,7 +4,6 @@ import {
   EntityContentBlueprint,
 } from '@backstage/plugin-catalog-react/alpha';
 import type { Entity } from '@backstage/catalog-model';
-import { z } from 'zod/v4';
 
 const isService = (entity: Entity) =>
   entity.kind === 'Component' && entity.spec?.type === 'service';
@@ -25,26 +24,16 @@ const deploymentsCard = EntityCardBlueprint.make({
 // The one Deployments tab — replaces the Argo CD plugin's separate
 // Deployment Lifecycle / Deployment Summary tabs (disabled in
 // app-config.yaml). See platform-architecture/BACKSTAGE_PART7.md.
-const deploymentsContent = EntityContentBlueprint.makeWithOverrides({
+const deploymentsContent = EntityContentBlueprint.make({
   name: 'deployments',
-  configSchema: {
-    // Browser-reachable Argo CD UI, for "Open in Argo CD" deep links —
-    // not argocd-backend's in-cluster URL. Omit to hide the link.
-    argocdUiUrl: z.string().optional(),
-  },
-  factory(originalFactory, { config }) {
-    return originalFactory({
-      path: 'deployments',
-      title: 'Deployments',
-      // Tabs are ordered by group (page:catalog/entity's groups config in
-      // app-config.yaml), not by extension order; ungrouped tabs go last.
-      group: 'deployment',
-      filter: isService,
-      loader: () =>
-        import('./DeploymentsContent').then(m => (
-          <m.DeploymentsContent argocdUiUrl={config.argocdUiUrl} />
-        )),
-    });
+  params: {
+    path: 'deployments',
+    title: 'Deployments',
+    // Tabs are ordered by group (page:catalog/entity's groups config in
+    // app-config.yaml), not by extension order; ungrouped tabs go last.
+    group: 'deployment',
+    filter: isService,
+    loader: () => import('./DeploymentsContent').then(m => <m.DeploymentsContent />),
   },
 });
 

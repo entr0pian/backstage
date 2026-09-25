@@ -13,7 +13,8 @@ import {
 import { useEntity } from '@backstage/plugin-catalog-react';
 import { kubernetesProxyPermission } from '@backstage/plugin-kubernetes-common';
 import { usePermission } from '@backstage/plugin-permission-react';
-import { argoApplicationUrl, type Deployment } from './joinDeployments';
+import { type Deployment } from './joinDeployments';
+import { argoApplicationUrl, useArgocdUiUrl } from '../platformUi/argocd';
 import { useDeployments } from './useDeployments';
 import { LogsDialog } from './LogsDialog';
 import { DetailsDrawer } from './DetailsDrawer';
@@ -61,7 +62,10 @@ const EnvironmentCard = ({
   onViewDetails: () => void;
   onViewLogs: () => void;
 }) => {
-  const argoUrl = argoApplicationUrl(argocdUiUrl, deployment);
+  const argoUrl = argoApplicationUrl(argocdUiUrl, {
+    name: deployment.argoApplicationName,
+    namespace: deployment.argoApplicationNamespace,
+  });
   return (
     <InfoCard
       title={deployment.environment}
@@ -123,8 +127,9 @@ const EnvironmentCard = ({
 // Part A), which replaced the Argo CD plugin's embedded resource view.
 // Level 4 is the "Open in Argo CD" deep link. Per-environment Logs
 // (BACKSTAGE_PART8.md) open LogsDialog.
-export const DeploymentsContent = ({ argocdUiUrl }: { argocdUiUrl?: string }) => {
+export const DeploymentsContent = () => {
   const { entity } = useEntity();
+  const argocdUiUrl = useArgocdUiUrl();
   const state = useDeployments(entity.metadata.name);
   const [detailsEnvironment, setDetailsEnvironment] = useState<string | null>(null);
   const [logs, setLogs] = useState<{ environment: string; podName?: string } | null>(null);
