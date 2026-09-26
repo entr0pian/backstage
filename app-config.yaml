@@ -194,6 +194,12 @@ catalog:
       rules:
         - allow: [Template]
 
+    # Create deployment template — see DEPLOYMENTS.md (platform-architecture repo)
+    - type: file
+      target: ../../templates/create-deployment/template.yaml
+      rules:
+        - allow: [Template]
+
     # Guest User/Group that guest sign-in resolves to
     - type: file
       target: ../../examples/org.yaml
@@ -242,6 +248,11 @@ platform:
   # read-only without logging in (anonymous role:readonly, see
   # bootstrap-cluster/install-argocd values.yaml).
   argocdUiUrl: https://argocd.gerodimos.dev
+  # Environments the Create deployment template offers (its Environment
+  # picker). Only management runs today; add dev/prod here when those
+  # clusters exist again.
+  environments:
+    - management
 
 platformCatalog:
   enabled: false

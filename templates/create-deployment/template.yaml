@@ -1,0 +1,105 @@
+apiVersion: scaffolder.backstage.io/v1beta3
+kind: Template
+metadata:
+  name: create-deployment
+  title: Create deployment
+  description: >-
+    Deploy a version of a platform component to an environment by opening a
+    pull request against application-repositories with its Release. Creates
+    the Release for a new environment, or updates the version/bindings of an
+    existing one. Backstage creates nothing in the cluster — once the PR is
+    merged, release-operator and Argo CD deploy it.
+spec:
+  owner: user:guest
+  type: deployment
+
+  parameters:
+    - title: Deployment
+      required:
+        - componentName
+        - environment
+        - version
+      properties:
+        componentName:
+          title: Component
+          type: string
+          description: >-
+            The platform component to deploy. Derived from the Catalog entity
+            you launched this from — not editable here.
+          ui:disabled: true
+        environment:
+          title: Environment
+          type: string
+          description: The environments listed in platform.environments (app-config).
+          ui:field: PlatformEnvironmentPicker
+        version:
+          title: Version
+          type: string
+          description: >-
+            A commit on main whose CI succeeded — its image is tagged with the
+            commit SHA.
+          pattern: '^[0-9a-f]{40}$'
+          ui:field: PlatformVersionPicker
+        bindings:
+          title: Bind dependencies
+          type: object
+          description: >-
+            The component's dependencies in the chosen environment. The
+            running service gets their connection details.
+          ui:field: PlatformDependencyBindingsPicker
+
+  steps:
+    - id: render-release
+      name: Render Release manifest
+      action: fetch:template
+      input:
+        url: ./skeleton
+        targetPath: platform/environments/${{ parameters.environment }}
+        values:
+          componentName: ${{ parameters.componentName }}
+          environment: ${{ parameters.environment }}
+          version: ${{ parameters.version }}
+          bindings: ${{ parameters.bindings or {} }}
+
+    # fetch:template only templates file *contents*, not file names (same as
+    # add-database), so the static release.yaml is renamed to the
+    # <component>-release.yaml the platform uses.
+    - id: rename-release
+      name: Rename to <component>-release.yaml
+      action: fs:rename
+      input:
+        files:
+          - from: platform/environments/${{ parameters.environment }}/release.yaml
+            to: platform/environments/${{ parameters.environment }}/${{ parameters.componentName }}-release.yaml
+
+    # One PR per deployment: the branch carries the version, so each deploy
+    # gets its own PR and merging it is what deploys that version.
+    - id: open-pr
+      name: Open pull request
+      action: publish:github:pull-request
+      input:
+        repoUrl: github.com?repo=application-repositories&owner=entr0pian
+        branchName: backstage/deploy-${{ parameters.componentName }}-${{ parameters.environment }}-${{ parameters.version | truncate(7, true, "") }}
+        title: 'Deploy ${{ parameters.componentName }} ${{ parameters.version | truncate(7, true, "") }} to ${{ parameters.environment }}'
+        description: |-
+          Sets the `Release` for `${{ parameters.componentName }}` in `${{ parameters.environment }}`.
+
+          | Field | Value |
+          |---|---|
+          | Component | `${{ parameters.componentName }}` |
+          | Environment | `${{ parameters.environment }}` |
+          | Version | `${{ parameters.version }}` |
+          | Database | ${{ ('`' + parameters.bindings.database + '`') if (parameters.bindings and parameters.bindings.database) else 'not bound' }} |
+
+          Generated through Backstage's **Create deployment** template. Writes
+          the whole of `platform/environments/${{ parameters.environment }}/${{ parameters.componentName }}-release.yaml`:
+          for a new environment that's a new file, for an existing one the
+          diff is only what changed (usually `version:`).
+
+          Merging deploys it: release-operator writes the component's
+          environment files and Argo CD syncs them.
+
+  output:
+    links:
+      - title: Pull request
+        url: ${{ steps['open-pr'].output.remoteUrl }}

@@ -339,3 +339,66 @@ platformCatalog:
   component, merge the PR, wait for Argo CD to sync the `Database` CR, then
   wait up to 60s and refresh the component's Catalog page — the database
   appears under **Depends on resources** and in the Relations graph.
+
+## Create deployment template
+
+Step 1 of `DEPLOYMENTS.md` (in `platform-architecture`): deploy a version of
+a service to an environment from its Catalog page, instead of hand-writing
+its `Release`.
+
+```
+Catalog → <component> → Platform Actions → Create deployment
+    ↓
+form: Environment / Version / Bind dependencies (component pre-filled)
+    ↓
+Backstage renders the whole Release and opens a PR against
+entr0pian/application-repositories
+    ↓
+Merging the PR deploys it: release-operator writes the component's
+environment files, Argo CD syncs them
+```
+
+- **Template**: `templates/create-deployment/template.yaml`
+  (+ `skeleton/release.yaml`, renamed to `<component>-release.yaml`),
+  registered in both `app-config.yaml` and `app-config.production.yaml`.
+  Destination: `platform/environments/<env>/<component>-release.yaml`.
+  The file is always written in full, so a new environment is a new file
+  and an update's diff is only what changed.
+- **One PR per deployment**: branch
+  `backstage/deploy-<component>-<env>-<short sha>`. Two open PRs for the
+  same environment edit the same file, so after one merges the other
+  conflicts. That's the intended signal that it's out of date.
+- **Custom form fields**: `packages/app/src/modules/createDeployment/`, a
+  scaffolder frontend module (`FormFieldBlueprint`):
+  - `PlatformEnvironmentPicker`: the `platform.environments` list in
+    `app-config.yaml`. It's only `management` today; add a cluster there when
+    it exists.
+  - `PlatformVersionPicker`: commits on the component repo's `main` whose
+    `ci.yaml` push run succeeded. CI only pushes an image, tagged with the
+    full commit SHA, from those runs. Each entry shows the short SHA, commit
+    message, author and age; the value is the full SHA, i.e. the Release's
+    `spec.version`. Served by `GET /api/platform/versions/:component`
+    (`packages/backend/src/modules/releaseVersions/DeployableVersion*`),
+    which takes the repo from the entity's `github.com/project-slug`
+    annotation and calls GitHub with the backend's `integrations.github`
+    token.
+  - `PlatformDependencyBindingsPicker`: the component's catalog Resources
+    (`dependencyOf` + `platform.taskapp.io/environment` = the chosen
+    environment), one dropdown per bindable type. It clears when the
+    environment changes, and with no dependencies it links to Add Database
+    for that environment. `bindings.ts`'s `BINDING_TYPES` maps a resource
+    type to its Release binding: today only `database` →
+    `bindings.database: { enabled: true, ref }`, since a Release binds at
+    most one database.
+
+### Testing the flow
+
+- **Template rendering**:
+  `node --test templates/create-deployment/render.test.mjs`
+- **Unit tests**:
+  `yarn backstage-cli repo test packages/app/src/modules/createDeployment packages/app/src/modules/platformActions packages/backend/src/modules/releaseVersions`
+- **End-to-end** (deployed instance): open a service's Catalog page and
+  click **Create deployment**. Pick `management`, a version and (if it has
+  one) its database, then submit. Confirm the PR on
+  `entr0pian/application-repositories` contains the expected
+  `platform/environments/management/<component>-release.yaml`.

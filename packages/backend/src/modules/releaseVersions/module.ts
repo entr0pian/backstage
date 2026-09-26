@@ -1,12 +1,19 @@
 import { coreServices, createBackendPlugin } from '@backstage/backend-plugin-api';
+import { catalogServiceRef } from '@backstage/plugin-catalog-node';
+import {
+  DefaultGithubCredentialsProvider,
+  ScmIntegrations,
+} from '@backstage/integration';
 import { ReleaseVersionReader } from './ReleaseVersionReader';
+import { DeployableVersionReader } from './DeployableVersionReader';
 import { createRouter } from './router';
 import { EnvironmentSummaryReader } from '../environmentSummary/EnvironmentSummaryReader';
 import { DatabaseSummaryReader } from '../databaseSummary/DatabaseSummaryReader';
 
 // Exposes GET /api/platform/releases/:component and
 // GET /api/platform/environments/:component/:environment and
-// GET /api/platform/databases/:namespace/:name (BACKSTAGE_PART9.md). Gated on
+// GET /api/platform/databases/:namespace/:name (BACKSTAGE_PART9.md) and
+// GET /api/platform/versions/:component (DEPLOYMENTS.md Step 1). Gated on
 // platformCatalog.enabled/platformCatalog.namespaces — the same flag and
 // namespace list PlatformEntityProvider already uses, since both need the
 // same Kubernetes connectivity/RBAC (see
@@ -23,8 +30,9 @@ export const releaseVersionsModule = createBackendPlugin({
         httpAuth: coreServices.httpAuth,
         permissions: coreServices.permissions,
         logger: coreServices.logger,
+        catalog: catalogServiceRef,
       },
-      async init({ config, httpRouter, httpAuth, permissions, logger }) {
+      async init({ config, httpRouter, httpAuth, permissions, logger, catalog }) {
         if (!config.getOptionalBoolean('platformCatalog.enabled')) {
           logger.info(
             'platformCatalog.enabled is not true — Release Versions route not registered',
@@ -43,6 +51,13 @@ export const releaseVersionsModule = createBackendPlugin({
             reader,
             environments: new EnvironmentSummaryReader(reader, logger),
             databases: new DatabaseSummaryReader(namespaces, reader, logger),
+            versions: new DeployableVersionReader({
+              catalog,
+              githubCredentials: DefaultGithubCredentialsProvider.fromIntegrations(
+                ScmIntegrations.fromConfig(config),
+              ),
+              logger,
+            }),
             httpAuth,
             permissions,
           }),

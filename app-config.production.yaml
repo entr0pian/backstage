@@ -70,3 +70,9 @@ catalog:
       target: ./templates/add-database/template.yaml
       rules:
         - allow: [Template]
+
+    # Create deployment template — see DEPLOYMENTS.md (platform-architecture repo)
+    - type: file
+      target: ./templates/create-deployment/template.yaml
+      rules:
+        - allow: [Template]

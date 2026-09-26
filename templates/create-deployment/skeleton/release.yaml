@@ -1,0 +1,17 @@
+apiVersion: platform.taskapp.io/v1alpha1
+kind: Release
+metadata:
+  name: ${{ values.componentName }}-${{ values.environment }}
+  labels:
+    platform.taskapp.io/component: ${{ values.componentName }}
+spec:
+  componentRef:
+    name: ${{ values.componentName }}
+  environment: ${{ values.environment }}
+  version: "${{ values.version }}"
+{%- if values.bindings.database %}
+  bindings:
+    database:
+      enabled: true
+      ref: ${{ values.bindings.database }}
+{%- endif %}

@@ -6,5 +6,12 @@ export interface Config {
      * @visibility frontend
      */
     argocdUiUrl?: string;
+    /**
+     * Environments a component can be deployed to — the Create deployment
+     * template's Environment picker offers exactly these. Each is a
+     * platform/environments/<env> folder in application-repositories.
+     * @visibility frontend
+     */
+    environments?: string[];
   };
 }

@@ -10,4 +10,12 @@ describe('addDatabaseHref', () => {
       componentName: 'checkout',
     });
   });
+
+  it('also forwards the environment when given', () => {
+    const url = new URL(addDatabaseHref('checkout', 'management'), 'http://localhost');
+    expect(JSON.parse(url.searchParams.get('formData')!)).toEqual({
+      componentName: 'checkout',
+      environment: 'management',
+    });
+  });
 });

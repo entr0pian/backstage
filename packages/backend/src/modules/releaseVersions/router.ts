@@ -11,6 +11,7 @@ import type { EnvironmentSummaryReader } from '../environmentSummary/Environment
 import { buildEnvironmentSummary } from '../environmentSummary/EnvironmentSummary';
 import type { DatabaseSummaryReader } from '../databaseSummary/DatabaseSummaryReader';
 import { buildDatabaseSummary } from '../databaseSummary/DatabaseSummary';
+import type { DeployableVersionReader } from './DeployableVersionReader';
 
 // GET /api/platform/releases/:component -> { component, releases: [...] }.
 // A component with no matching Release CRs returns releases: [] with a 200,
@@ -21,10 +22,11 @@ export function createRouter(options: {
   reader: ReleaseVersionReader;
   environments: EnvironmentSummaryReader;
   databases: DatabaseSummaryReader;
+  versions: DeployableVersionReader;
   httpAuth: HttpAuthService;
   permissions: PermissionsService;
 }): ExpressRouter {
-  const { reader, environments, databases, httpAuth, permissions } = options;
+  const { reader, environments, databases, versions, httpAuth, permissions } = options;
   const router = Router();
 
   // Owner-only detail is decided per request, server-side, by whether the
@@ -42,6 +44,22 @@ export function createRouter(options: {
     const { component } = req.params;
     const releases = await reader.listForComponent(component);
     res.json({ component, releases });
+  });
+
+  // GET /api/platform/versions/:component -> { component, repository,
+  // versions: [...] }, newest first — commits on main with a built image,
+  // for the Create deployment template's Version picker (DEPLOYMENTS.md
+  // Step 1). Nothing sensitive: commit SHA/message/author of the
+  // component's own repo.
+  router.get('/versions/:component', async (req, res) => {
+    const { component } = req.params;
+    const credentials = await httpAuth.credentials(req);
+    const result = await versions.listForComponent(component, credentials);
+    if (result.status === 'not-found') {
+      res.status(404).json({ error: result.error });
+      return;
+    }
+    res.json({ component, repository: result.repository, versions: result.versions });
   });
 
   // GET /api/platform/environments/:component/:environment -> one
