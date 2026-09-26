@@ -1,4 +1,6 @@
 import Box from '@material-ui/core/Box';
+import CloudUploadIcon from '@material-ui/icons/CloudUpload';
+import StorageIcon from '@material-ui/icons/Storage';
 import { InfoCard, LinkButton } from '@backstage/core-components';
 import { useEntity } from '@backstage/plugin-catalog-react';
 import { usePermission } from '@backstage/plugin-permission-react';
@@ -18,12 +20,22 @@ export const PlatformActionsCard = () => {
 
   return (
     <InfoCard title="Platform Actions">
-      <Box display="flex" flexWrap="wrap" style={{ gap: 8 }}>
-        <LinkButton to={createDeploymentHref(entity.metadata.name)} color="primary" variant="contained">
+      <Box display="flex" flexWrap="wrap" style={{ gap: 12 }}>
+        <LinkButton
+          to={createDeploymentHref(entity.metadata.name)}
+          color="primary"
+          variant="contained"
+          startIcon={<CloudUploadIcon />}
+        >
           Create deployment
         </LinkButton>
-        <LinkButton to={addDatabaseHref(entity.metadata.name)} color="primary">
-          + Add Database
+        <LinkButton
+          to={addDatabaseHref(entity.metadata.name)}
+          color="primary"
+          variant="outlined"
+          startIcon={<StorageIcon />}
+        >
+          Add database
         </LinkButton>
       </Box>
     </InfoCard>
