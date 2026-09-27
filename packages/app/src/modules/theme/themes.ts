@@ -74,19 +74,10 @@ const components = (mode: Mode) => {
         label: { letterSpacing: '0.06em', opacity: 0.8 },
       },
     },
-    // The divider's own styles are dropped when overridden, not merged, so
-    // this restates all of them (height/width/margin) — not just the colour.
-    BackstageSidebarDivider: {
-      styleOverrides: {
-        root: {
-          height: 1,
-          width: '100%',
-          margin: '12px 0',
-          border: 'none',
-          background: 'rgba(148, 163, 184, 0.14)',
-        },
-      },
-    },
+    // No BackstageSidebarDivider override: that component is a MUI v4
+    // styled() whose style is a function, and any theme override for it
+    // (even one restating every property) makes it render with no styles at
+    // all — the divider collapses to a dot.
     BackstageInfoCard: {
       styleOverrides: {
         header: { paddingBottom: 12 },
