@@ -74,9 +74,17 @@ const components = (mode: Mode) => {
         label: { letterSpacing: '0.06em', opacity: 0.8 },
       },
     },
+    // The divider's own styles are dropped when overridden, not merged, so
+    // this restates all of them (height/width/margin) — not just the colour.
     BackstageSidebarDivider: {
       styleOverrides: {
-        root: { background: 'rgba(148, 163, 184, 0.14)' },
+        root: {
+          height: 1,
+          width: '100%',
+          margin: '12px 0',
+          border: 'none',
+          background: 'rgba(148, 163, 184, 0.14)',
+        },
       },
     },
     BackstageInfoCard: {

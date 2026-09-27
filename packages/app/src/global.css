@@ -12,9 +12,14 @@
  *
  * Deliberately NOT inside a CSS @layer, so it wins over @backstage/ui's
  * layered rules regardless of import order.
+ *
+ * `flow-root` so the last child's bottom margin stays inside body instead of
+ * collapsing through it — otherwise it extends html past body and leaves an
+ * unpainted strip at the bottom of scrolled pages.
  */
 body {
   min-height: 100vh;
+  display: flow-root;
 }
 
 /* Backstage UI (BUI) tokens, matched to the MUI theme in modules/theme so
