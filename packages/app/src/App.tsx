@@ -5,6 +5,7 @@ import argocdPlugin, {
 } from '@backstage-community/plugin-argocd';
 import { navModule } from './modules/nav';
 import { signInModule } from './modules/signIn';
+import { themeModule } from './modules/theme';
 import { platformActionsModule } from './modules/platformActions';
 import { deploymentsModule } from './modules/deployments';
 import { dependenciesModule } from './modules/dependencies';
@@ -16,6 +17,7 @@ export default createApp({
     catalogPlugin,
     navModule,
     signInModule,
+    themeModule,
     platformActionsModule,
     deploymentsModule,
     dependenciesModule,

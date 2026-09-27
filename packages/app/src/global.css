@@ -16,3 +16,66 @@
 body {
   min-height: 100vh;
 }
+
+/* Backstage UI (BUI) tokens, matched to the MUI theme in modules/theme so
+ * the newer BUI-rendered parts (page headers, breadcrumbs, catalog filters)
+ * and the older MUI parts read as one design. Unlayered for the same reason
+ * as above: it has to beat BUI's own `@layer tokens` defaults.
+ */
+:root,
+[data-theme-mode='light'] {
+  --bui-font-regular: Inter, system-ui, -apple-system, 'Segoe UI', Roboto,
+    'Helvetica Neue', Arial, sans-serif;
+  --bui-ring: #6366f1;
+
+  --bui-bg-app: #f5f6fb;
+  --bui-bg-neutral-1: #ffffff;
+  --bui-bg-neutral-2: #f8f9fc;
+  --bui-bg-neutral-3: #ffffff;
+  --bui-bg-neutral-4: #f1f3f9;
+
+  --bui-fg-primary: #0f172a;
+  --bui-fg-secondary: #64748b;
+
+  --bui-border-1: #e6e8f0;
+  --bui-border-2: #cbd2e1;
+
+  --bui-accent-bg: #4f46e5;
+  --bui-accent-bg-hover: #4338ca;
+  --bui-bg-solid: #4f46e5;
+  --bui-bg-solid-hover: #4338ca;
+  --bui-bg-solid-pressed: #3730a3;
+
+  --bui-shadow: 0 1px 2px rgba(15, 23, 42, 0.04),
+    0 4px 16px -6px rgba(15, 23, 42, 0.08);
+}
+
+[data-theme-mode='dark'] {
+  --bui-ring: #818cf8;
+
+  --bui-bg-app: #0a0e1a;
+  --bui-bg-neutral-1: #121829;
+  --bui-bg-neutral-2: #182036;
+  --bui-bg-neutral-3: #1e2740;
+  --bui-bg-neutral-4: #242e4a;
+
+  --bui-fg-primary: #e2e8f0;
+  --bui-fg-secondary: #94a3b8;
+
+  --bui-border-1: rgba(148, 163, 184, 0.14);
+  --bui-border-2: rgba(148, 163, 184, 0.28);
+
+  --bui-accent-bg: #818cf8;
+  --bui-accent-bg-hover: #a5b4fc;
+  --bui-bg-solid: #818cf8;
+  --bui-bg-solid-hover: #a5b4fc;
+  --bui-bg-solid-pressed: #a5b4fc;
+  --bui-fg-solid: #0a0e1a;
+
+  --bui-scrollbar-thumb: #334155;
+}
+
+body {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
