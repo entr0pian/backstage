@@ -12,6 +12,8 @@ import { buildEnvironmentSummary } from '../environmentSummary/EnvironmentSummar
 import type { DatabaseSummaryReader } from '../databaseSummary/DatabaseSummaryReader';
 import { buildDatabaseSummary } from '../databaseSummary/DatabaseSummary';
 import type { DeployableVersionReader } from './DeployableVersionReader';
+import type { ScaffoldVersionReader } from '../scaffoldVersions/ScaffoldVersionReader';
+import { isValidScaffoldName } from '../scaffoldVersions/ScaffoldVersionMapper';
 
 // GET /api/platform/releases/:component -> { component, releases: [...] }.
 // A component with no matching Release CRs returns releases: [] with a 200,
@@ -23,10 +25,11 @@ export function createRouter(options: {
   environments: EnvironmentSummaryReader;
   databases: DatabaseSummaryReader;
   versions: DeployableVersionReader;
+  scaffolds: ScaffoldVersionReader;
   httpAuth: HttpAuthService;
   permissions: PermissionsService;
 }): ExpressRouter {
-  const { reader, environments, databases, versions, httpAuth, permissions } = options;
+  const { reader, environments, databases, versions, scaffolds, httpAuth, permissions } = options;
   const router = Router();
 
   // Owner-only detail is decided per request, server-side, by whether the
@@ -60,6 +63,19 @@ export function createRouter(options: {
       return;
     }
     res.json({ component, repository: result.repository, versions: result.versions });
+  });
+
+  // GET /api/platform/scaffolds/:template/versions -> { template, latest,
+  // versions: [...] }, newest first — released platform-scaffolds versions
+  // of one template, for the Onboard Service template's Scaffold version
+  // picker (defaults to latest). Nothing sensitive: public release tags.
+  router.get('/scaffolds/:template/versions', async (req, res) => {
+    const { template } = req.params;
+    if (!isValidScaffoldName(template)) {
+      res.status(400).json({ error: `Invalid scaffold template name: ${template}` });
+      return;
+    }
+    res.json({ template, ...(await scaffolds.listForTemplate(template)) });
   });
 
   // GET /api/platform/environments/:component/:environment -> one

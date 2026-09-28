@@ -18,6 +18,7 @@ spec:
       required:
         - name
         - owner
+        - scaffoldVersion
       properties:
         name:
           title: Service name
@@ -55,9 +56,10 @@ spec:
           title: Scaffold version
           type: string
           description: >-
-            SemVer tag of the platform-scaffolds template, without a
-            leading "v".
-          default: '0.3.0'
+            Released version of the scaffold template. Defaults to the
+            latest; pick an older one only to pin a previous scaffold.
+          pattern: '^\d+\.\d+\.\d+$'
+          ui:field: PlatformScaffoldVersionPicker
 
   steps:
     - id: render-component

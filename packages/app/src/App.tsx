@@ -11,6 +11,7 @@ import { deploymentsModule } from './modules/deployments';
 import { dependenciesModule } from './modules/dependencies';
 import { databasesModule } from './modules/databases';
 import { createDeploymentModule } from './modules/createDeployment';
+import { onboardServiceModule } from './modules/onboardService';
 
 export default createApp({
   features: [
@@ -23,6 +24,7 @@ export default createApp({
     dependenciesModule,
     databasesModule,
     createDeploymentModule,
+    onboardServiceModule,
     argocdPlugin,
     argocdTranslationsModule,
   ],
