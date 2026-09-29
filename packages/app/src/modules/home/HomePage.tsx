@@ -7,9 +7,12 @@ import AddBoxOutlinedIcon from '@material-ui/icons/AddBoxOutlined';
 import StorageOutlinedIcon from '@material-ui/icons/StorageOutlined';
 import RocketLaunchIcon from '@material-ui/icons/FlightTakeoff';
 import ArrowForwardIcon from '@material-ui/icons/ArrowForward';
+import LockOutlinedIcon from '@material-ui/icons/LockOutlined';
 import { Content, Link, Progress, ResponseErrorPanel } from '@backstage/core-components';
 import { configApiRef, useApi } from '@backstage/core-plugin-api';
 import { catalogApiRef } from '@backstage/plugin-catalog-react';
+import { usePermission } from '@backstage/plugin-permission-react';
+import { taskCreatePermission } from '@backstage/plugin-scaffolder-common/alpha';
 import type { Entity } from '@backstage/catalog-model';
 import { useDeployments } from '../deployments/useDeployments';
 import { EnvironmentPulseRow } from '../metrics/EnvironmentPulse';
@@ -115,6 +118,19 @@ const useStyles = makeStyles(theme => ({
   },
   actionTitle: { fontWeight: 700, fontSize: '0.98rem' },
   actionText: { fontSize: '0.82rem', color: theme.palette.text.secondary, marginTop: 2 },
+  ownerOnly: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: theme.spacing(1),
+    padding: theme.spacing(0.25, 1),
+    borderRadius: 999,
+    fontSize: '0.7rem',
+    fontWeight: 600,
+    color: theme.palette.text.secondary,
+    backgroundColor: theme.palette.action.hover,
+    '& svg': { fontSize: '0.8rem' },
+  },
   service: {
     height: '100%',
     display: 'flex',
@@ -221,6 +237,9 @@ export const HomePage = () => {
   const [services, setServices] = useState<Entity[] | null>(null);
   const [templates, setTemplates] = useState<number | null>(null);
   const [error, setError] = useState<Error | null>(null);
+  // Guests can open a template but not run it; say so before they click.
+  const { allowed: canRun, loading: permissionLoading } = usePermission({ permission: taskCreatePermission });
+  const readOnly = !permissionLoading && !canRun;
 
   useEffect(() => {
     let cancelled = false;
@@ -276,6 +295,11 @@ export const HomePage = () => {
                   <ArrowForwardIcon style={{ fontSize: '1rem', opacity: 0.6 }} />
                 </Box>
                 <div className={classes.actionText}>{a.text}</div>
+                {readOnly && (
+                  <span className={classes.ownerOnly}>
+                    <LockOutlinedIcon /> Owner only · view as guest
+                  </span>
+                )}
               </span>
             </Link>
           </Grid>
