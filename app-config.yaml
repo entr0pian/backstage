@@ -248,6 +248,10 @@ platform:
   # read-only without logging in (anonymous role:readonly, see
   # bootstrap-cluster/install-argocd values.yaml).
   argocdUiUrl: https://argocd.gerodimos.dev
+  # Browser-reachable Grafana for the Metrics tab's "Open in Grafana" links.
+  # Public, read-only: visitors land as anonymous Viewers (see
+  # application-repositories values/kube-prometheus-stack/management.yaml).
+  grafanaUiUrl: https://grafana.gerodimos.dev
   # Environments the Create deployment template offers (its Environment
   # picker). Only management runs today; add dev/prod here when those
   # clusters exist again.

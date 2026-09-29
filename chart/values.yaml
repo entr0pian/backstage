@@ -91,6 +91,12 @@ platformCatalog:
   # <repo>/tree/main/platform/environments/<env>. Empty: no link.
   gitopsRepoUrl: "https://github.com/entr0pian/application-repositories"
 
+observability:
+  # Cluster-internal Prometheus for the Metrics tab's backend route, e.g.
+  # http://kube-prometheus-stack-prometheus.monitoring.svc:9090. Empty
+  # leaves the route unregistered.
+  prometheusUrl: ""
+
 kubernetes:
   # Turns on @backstage/plugin-kubernetes-backend against the cluster
   # Backstage runs on, plus a read-only ClusterRole for its ServiceAccount

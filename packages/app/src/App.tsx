@@ -8,6 +8,7 @@ import { signInModule } from './modules/signIn';
 import { themeModule } from './modules/theme';
 import { platformActionsModule } from './modules/platformActions';
 import { deploymentsModule } from './modules/deployments';
+import { metricsModule } from './modules/metrics';
 import { dependenciesModule } from './modules/dependencies';
 import { databasesModule } from './modules/databases';
 import { createDeploymentModule } from './modules/createDeployment';
@@ -21,6 +22,7 @@ export default createApp({
     themeModule,
     platformActionsModule,
     deploymentsModule,
+    metricsModule,
     dependenciesModule,
     databasesModule,
     createDeploymentModule,

@@ -10,6 +10,8 @@ import { createRouter } from './router';
 import { EnvironmentSummaryReader } from '../environmentSummary/EnvironmentSummaryReader';
 import { DatabaseSummaryReader } from '../databaseSummary/DatabaseSummaryReader';
 import { ScaffoldVersionReader } from '../scaffoldVersions/ScaffoldVersionReader';
+import { PrometheusClient } from '../observabilitySummary/PrometheusClient';
+import { createObservabilityRouter } from '../observabilitySummary/router';
 
 // Exposes GET /api/platform/releases/:component and
 // GET /api/platform/environments/:component/:environment and
@@ -23,6 +25,11 @@ import { ScaffoldVersionReader } from '../scaffoldVersions/ScaffoldVersionReader
 // backstage/chart/templates/clusterrole.yaml — one ClusterRole, two
 // resource types). No dependency on deployments.enabled/Argo CD
 // connectivity at all — see BACKSTAGE_PART5.md's "Architecture" section.
+//
+// Separately, GET /api/platform/observability/components/:component/
+// environments/:environment (the Metrics tab, OBSERVABILLITY_PART4.md
+// Part 3) is registered whenever platform.observability.prometheusUrl is
+// set, regardless of platformCatalog — it only needs Prometheus.
 export const releaseVersionsModule = createBackendPlugin({
   pluginId: 'platform',
   register(reg) {
@@ -36,6 +43,17 @@ export const releaseVersionsModule = createBackendPlugin({
         catalog: catalogServiceRef,
       },
       async init({ config, httpRouter, httpAuth, permissions, logger, catalog }) {
+        const prometheusUrl = config.getOptionalString('platform.observability.prometheusUrl');
+        if (prometheusUrl) {
+          httpRouter.use(
+            createObservabilityRouter({ prometheus: new PrometheusClient(prometheusUrl), logger }),
+          );
+        } else {
+          logger.info(
+            'platform.observability.prometheusUrl is not set — Metrics route not registered',
+          );
+        }
+
         if (!config.getOptionalBoolean('platformCatalog.enabled')) {
           logger.info(
             'platformCatalog.enabled is not true — Release Versions route not registered',
