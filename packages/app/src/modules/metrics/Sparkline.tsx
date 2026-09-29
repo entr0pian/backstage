@@ -100,6 +100,7 @@ export const Sparkline = ({
   rangeSeconds,
   end,
   format,
+  accent,
 }: {
   label: string;
   points: Point[];
@@ -108,6 +109,8 @@ export const Sparkline = ({
   // Right edge of the x axis (unix seconds), so position reads as recency.
   end: number;
   format: (value: number) => string;
+  // Colour of the latest-point dot; the tile's status colour when abnormal.
+  accent?: string;
 }) => {
   const classes = useStyles();
   const [active, setActive] = useState<number | null>(null);
@@ -198,7 +201,7 @@ export const Sparkline = ({
           </div>
         </>
       ) : (
-        <div className={classes.dot} style={pct(last)} />
+        <div className={classes.dot} style={{ ...pct(last), ...(accent ? { background: accent } : {}) }} />
       )}
     </div>
   );

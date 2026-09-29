@@ -102,9 +102,15 @@ function render(responses: Record<string, ObservabilitySummary | Error>) {
 const card = (environment: string) =>
   screen.getByText(environment).closest('.MuiCard-root') as HTMLElement;
 
+const tile = (c: HTMLElement, label: string) => within(c).getByTestId(`metric-${label}`);
+
 // A tile's value as read on screen (number and unit are separate spans).
-const valueOf = (c: HTMLElement, label: string) =>
-  within(c).getByText(label).nextElementSibling?.textContent;
+const valueOf = (c: HTMLElement, label: string) => tile(c, label).children[1].textContent;
+
+// Each tile's presentation state (normal / warning / critical / unknown).
+const stateOf = (c: HTMLElement, label: string) => tile(c, label).getAttribute('data-state');
+
+const LABELS = ['Request rate', 'Error rate', 'P95 latency', 'CPU', 'Memory', 'Replicas', 'Restarts 1h'];
 
 describe('Metrics tab', () => {
   it('is a Metrics tab in the observability group, for service Components only', () => {
@@ -139,8 +145,8 @@ describe('Metrics tab', () => {
     expect(valueOf(c, 'P95 latency')).toBe('42ms');
     expect(valueOf(c, 'CPU')).toBe('18%');
     expect(valueOf(c, 'Memory')).toBe('41%');
-    expect(valueOf(c, 'Replicas')).toBe('2 / 2');
-    expect(valueOf(c, 'Restarts in the last hour')).toBe('3');
+    expect(valueOf(c, 'Replicas')).toBe('2 / 2ready');
+    expect(valueOf(c, 'Restarts 1h')).toBe('3');
     expect(within(c).getAllByRole('meter')).toHaveLength(2);
   });
 
@@ -156,13 +162,14 @@ describe('Metrics tab', () => {
         unavailable: ['restarts1h'],
       }),
     });
-    await waitFor(() => expect(screen.getByText('No data')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('Unknown')).toBeInTheDocument());
+    expect(screen.queryByText('Healthy')).not.toBeInTheDocument();
     const c = card('management');
     expect(valueOf(c, 'Request rate')).toBe('0req/s');
     for (const label of ['Error rate', 'P95 latency', 'CPU', 'Replicas']) {
       expect(valueOf(c, label)).toBe('—');
     }
-    expect(valueOf(c, 'Restarts in the last hour')).toBe('unavailable');
+    expect(valueOf(c, 'Restarts 1h')).toBe('unavailable');
     expect(within(c).queryAllByRole('meter')).toHaveLength(1);
   });
 
@@ -231,7 +238,71 @@ describe('Metrics tab', () => {
     await waitFor(() => expect(screen.getByText('Healthy')).toBeInTheDocument());
     expect(screen.queryByText(/trends cover the last 30 minutes/i)).not.toBeInTheDocument();
     fireEvent.mouseOver(screen.getByText('Healthy'));
-    expect(await screen.findByText('2 of 2 replicas available, 0% 5xx over 2m.')).toBeInTheDocument();
+    expect(await screen.findByText('2 of 2 replicas available, 0% 5xx over 2m')).toBeInTheDocument();
     expect(screen.getByText(/trends cover the last 30 minutes/i)).toBeInTheDocument();
+  });
+
+  describe('severity', () => {
+    const render1 = async (overrides: Partial<ObservabilitySummary>, status: string) => {
+      deploymentsIn('management');
+      render({ management: summary('management', overrides) });
+      await waitFor(() => expect(screen.getByText(status)).toBeInTheDocument());
+      return card('management');
+    };
+
+    it('healthy: calm card, no tile emphasised', async () => {
+      const c = await render1({ errorRatePercent: 0, replicas: { available: 2, desired: 2 }, restarts1h: 0 }, 'Healthy');
+      for (const label of LABELS) expect(stateOf(c, label)).toBe('normal');
+      expect(within(c).queryByTitle('Critical')).not.toBeInTheDocument();
+      expect(within(c).queryByTitle('Warning')).not.toBeInTheDocument();
+    });
+
+    it('error rate at 6%: Degraded, error rate critical, replicas normal', async () => {
+      const c = await render1({ errorRatePercent: 6, replicas: { available: 2, desired: 2 } }, 'Degraded');
+      expect(stateOf(c, 'Error rate')).toBe('critical');
+      expect(stateOf(c, 'Replicas')).toBe('normal');
+      expect(within(tile(c, 'Error rate')).getByTitle('Critical')).toBeInTheDocument();
+      expect(within(tile(c, 'Error rate')).getAllByText('5xx error rate is 6%').length).toBeGreaterThan(0);
+    });
+
+    it('1 of 2 replicas: Degraded, replicas critical, error rate normal', async () => {
+      const c = await render1({ errorRatePercent: 0, replicas: { available: 1, desired: 2 } }, 'Degraded');
+      expect(stateOf(c, 'Replicas')).toBe('critical');
+      expect(stateOf(c, 'Error rate')).toBe('normal');
+      expect(valueOf(c, 'Replicas')).toBe('1 / 2ready');
+    });
+
+    it('restarts: still Healthy, restarts tile warns', async () => {
+      const c = await render1({ errorRatePercent: 0, replicas: { available: 2, desired: 2 }, restarts1h: 3 }, 'Healthy');
+      expect(stateOf(c, 'Restarts 1h')).toBe('warning');
+      expect(within(tile(c, 'Restarts 1h')).getByTitle('Warning')).toBeInTheDocument();
+      expect(within(tile(c, 'Restarts 1h')).getAllByText('3 container restarts during the last hour').length).toBeGreaterThan(0);
+    });
+
+    it('several problems at once: each tile flagged, one Degraded summary', async () => {
+      const c = await render1(
+        { errorRatePercent: 8, replicas: { available: 1, desired: 2 }, restarts1h: 4 },
+        'Degraded',
+      );
+      expect(stateOf(c, 'Error rate')).toBe('critical');
+      expect(stateOf(c, 'Replicas')).toBe('critical');
+      expect(stateOf(c, 'Restarts 1h')).toBe('warning');
+      fireEvent.mouseOver(screen.getByText('Degraded'));
+      expect(await screen.findByText('Degraded because:')).toBeInTheDocument();
+      expect(screen.getByText('1 of 2 replicas available', { selector: 'li' })).toBeInTheDocument();
+      expect(screen.getByText('5xx error rate is 8%', { selector: 'li' })).toBeInTheDocument();
+    });
+
+    it('missing health data: Unknown, never Healthy', async () => {
+      const c = await render1({ replicas: null, unavailable: ['replicasAvailable', 'replicasDesired'] }, 'Unknown');
+      expect(screen.queryByText('Healthy')).not.toBeInTheDocument();
+      expect(stateOf(c, 'Replicas')).toBe('unknown');
+    });
+
+    it('high CPU and memory stay informational', async () => {
+      const c = await render1({ cpuUtilizationPercent: 97, memoryUtilizationPercent: 95 }, 'Healthy');
+      expect(stateOf(c, 'CPU')).toBe('normal');
+      expect(stateOf(c, 'Memory')).toBe('normal');
+    });
   });
 });

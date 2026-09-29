@@ -38,10 +38,12 @@ app:
     # break the component -> environment view.
     - entity-content:kubernetes/kubernetes: false
 
-    # Tab order: Overview | Deployments | TechDocs | APIs. The entity page
-    # sorts tabs by content group in this order (TechDocs is in
+    # Tab order: Overview | Deployments | Metrics | TechDocs | APIs. The
+    # entity page sorts tabs by content group in this order (TechDocs is in
     # "documentation", APIs in "development", our Deployments tab in
-    # "deployment"); a group with a single tab renders as a plain tab.
+    # "deployment", Metrics in "observability" — kept next to Deployments
+    # since both are per-environment runtime views); a group with a single
+    # tab renders as a plain tab.
     - page:catalog/entity:
         config:
           groups:
@@ -49,14 +51,14 @@ app:
                 title: Overview
             - deployment:
                 title: Deployments
+            - observability:
+                title: Observability
             - documentation:
                 title: Documentation
             - development:
                 title: Development
             - operation:
                 title: Operation
-            - observability:
-                title: Observability
 
 organization:
   name: gerodimos.dev

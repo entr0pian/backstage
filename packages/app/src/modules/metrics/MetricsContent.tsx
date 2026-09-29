@@ -5,7 +5,10 @@ import Grid from '@material-ui/core/Grid';
 import Tooltip from '@material-ui/core/Tooltip';
 import Typography from '@material-ui/core/Typography';
 import OpenInNewIcon from '@material-ui/icons/OpenInNew';
-import { alpha, makeStyles, useTheme } from '@material-ui/core/styles';
+import ErrorIcon from '@material-ui/icons/Error';
+import WarningIcon from '@material-ui/icons/Warning';
+import HelpOutlineIcon from '@material-ui/icons/HelpOutline';
+import { alpha, makeStyles, useTheme, type Theme } from '@material-ui/core/styles';
 import {
   EmptyState,
   InfoCard,
@@ -13,7 +16,6 @@ import {
   ResponseErrorPanel,
   StatusError,
   StatusOK,
-  StatusPending,
   StatusWarning,
   WarningPanel,
 } from '@backstage/core-components';
@@ -24,24 +26,31 @@ import { REFRESH_INTERVAL_MS, useObservabilitySummary } from './useObservability
 import { Sparkline } from './Sparkline';
 import { timeAgo } from '../platformUi';
 import {
-  ERROR_RATE_DEGRADED_PERCENT,
   formatCount,
   formatLatency,
   formatPercent,
   formatRate,
   formatReplicas,
-  healthReason,
-  metricsHealth,
   NO_DATA,
-  UTILIZATION_CRITICAL_PERCENT,
-  UTILIZATION_WARNING_PERCENT,
-  utilizationSeverity,
   type ObservabilitySummary,
   type SeriesKey,
-  type Severity,
 } from './summary';
+import {
+  ERROR_RATE_DEGRADED_PERCENT,
+  evaluateHealth,
+  type HealthEvaluation,
+  type MetricEvaluation,
+  type MetricState,
+} from './health';
 
 const SERIES_RANGE_SECONDS = 30 * 60;
+
+// Status colour per tile state; null = no emphasis (the calm default).
+const stateColor = (theme: Theme, state: MetricState): string | null => {
+  if (state === 'critical') return theme.palette.error.main;
+  if (state === 'warning') return theme.palette.warning.main;
+  return null;
+};
 
 const useStyles = makeStyles(theme => ({
   section: {
@@ -62,17 +71,27 @@ const useStyles = makeStyles(theme => ({
     borderRadius: theme.shape.borderRadius * 2,
     border: `1px solid ${theme.palette.divider}`,
     backgroundColor: theme.palette.background.default,
+    transition: 'border-color 200ms ease, background-color 200ms ease',
+  },
+  labelRow: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    minHeight: 20,
   },
   label: {
     color: theme.palette.text.secondary,
     fontSize: '0.78rem',
     fontWeight: 500,
+    whiteSpace: 'nowrap',
   },
+  stateIcon: { fontSize: '1.1rem' },
   value: {
     fontSize: '1.6rem',
     fontWeight: 600,
     lineHeight: 1.25,
     marginTop: theme.spacing(0.25),
+    whiteSpace: 'nowrap',
   },
   unit: {
     fontSize: '0.9rem',
@@ -91,22 +110,14 @@ const useStyles = makeStyles(theme => ({
     whiteSpace: 'nowrap',
     overflow: 'hidden',
   },
+  reason: { fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis' },
   visual: {
     marginTop: 'auto',
     paddingTop: theme.spacing(1),
     height: 36 + 8,
   },
-  inlineStat: {
-    height: 36,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    borderTop: `1px solid ${theme.palette.divider}`,
-  },
-  inlineValue: {
-    fontSize: '1.1rem',
-    fontWeight: 600,
-  },
+  pips: { display: 'flex', alignItems: 'center', gap: 6, height: 36 },
+  pip: { width: 10, height: 10, borderRadius: '50%', boxSizing: 'border-box' },
   meterTrack: {
     flex: 1,
     height: 6,
@@ -117,13 +128,6 @@ const useStyles = makeStyles(theme => ({
     height: '100%',
     borderRadius: 3,
     transition: 'width 400ms ease',
-  },
-  live: {
-    display: 'inline-block',
-    width: 8,
-    height: 8,
-    borderRadius: '50%',
-    marginRight: theme.spacing(1),
   },
   healthTrigger: {
     background: 'none',
@@ -154,8 +158,16 @@ const useStyles = makeStyles(theme => ({
     flexDirection: 'column',
     gap: theme.spacing(0.75),
     '& .MuiTypography-body2': { fontSize: '0.8rem' },
+    '& ul': { margin: theme.spacing(0.5, 0, 0), paddingLeft: theme.spacing(2.5), fontWeight: 400 },
   },
   explanationLead: { fontWeight: 600 },
+  live: {
+    display: 'inline-block',
+    width: 8,
+    height: 8,
+    borderRadius: '50%',
+    marginRight: theme.spacing(1),
+  },
   footer: {
     display: 'flex',
     alignItems: 'center',
@@ -166,10 +178,11 @@ const useStyles = makeStyles(theme => ({
   },
 }));
 
-// Splits "12.4 req/s" / "42 ms" / "18%" into a big number and a quieter unit.
+// Splits "12.4 req/s" / "42 ms" / "18%" / "1 / 2 ready" into a big value
+// and a quieter unit.
 const ValueText = ({ text }: { text: string }) => {
   const classes = useStyles();
-  const match = /^([\d.,]+)\s*(%|ms|s|req\/s)$/.exec(text);
+  const match = /^([\d.,]+(?: \/ [\d.,]+)?)\s*(%|ms|s|req\/s|ready)$/.exec(text);
   if (!match || text === NO_DATA) return <>{text}</>;
   return (
     <>
@@ -179,55 +192,90 @@ const ValueText = ({ text }: { text: string }) => {
   );
 };
 
+const StateIcon = ({ state }: { state: MetricState }) => {
+  const classes = useStyles();
+  const theme = useTheme();
+  if (state === 'critical') {
+    return <ErrorIcon className={classes.stateIcon} style={{ color: theme.palette.error.main }} titleAccess="Critical" />;
+  }
+  if (state === 'warning') {
+    return <WarningIcon className={classes.stateIcon} style={{ color: theme.palette.warning.main }} titleAccess="Warning" />;
+  }
+  return null;
+};
+
+// One signal. Calm when normal; when warning/critical, the border, a light
+// tint, the icon, the value and the reason line all take the status colour
+// so the offending tile is the first thing the eye lands on.
 const Tile = ({
   label,
   value,
-  unavailable,
-  blankHint,
+  evaluation,
   context,
   visual,
 }: {
   label: string;
   value: string;
-  unavailable?: boolean;
-  // Why the value is blank (no data), shown on hover.
-  blankHint?: string;
-  // One line under the value: a short explanation, a meter, or a status
-  // (severity icon + words, never colour alone).
+  evaluation: MetricEvaluation;
+  // One line under the value (a short explanation or a meter). Replaced by
+  // the evaluation's reason when the tile is abnormal.
   context?: ReactNode;
-  // The fixed-height bottom row: a sparkline or an inline stat.
+  // The fixed-height bottom row: a sparkline or pips.
   visual?: ReactNode;
 }) => {
   const classes = useStyles();
-  let title = '';
-  if (unavailable) title = 'This metric could not be queried';
-  else if (value === NO_DATA) title = blankHint ?? 'No data';
+  const theme = useTheme();
+  const { state, reason } = evaluation;
+  const color = stateColor(theme, state);
+  const failed = reason === 'Could not be queried';
+
   return (
-    <Box className={classes.tile}>
-      <Typography className={classes.label}>{label}</Typography>
-      <Tooltip title={title}>
-        <Typography className={classes.value} color={unavailable ? 'textSecondary' : 'textPrimary'}>
-          {unavailable ? 'unavailable' : <ValueText text={value} />}
+    <Box
+      className={classes.tile}
+      data-testid={`metric-${label}`}
+      data-state={state}
+      style={
+        color
+          ? {
+              borderColor: alpha(color, 0.6),
+              backgroundColor: alpha(color, theme.palette.type === 'dark' ? 0.12 : 0.05),
+            }
+          : undefined
+      }
+    >
+      <div className={classes.labelRow}>
+        <Typography className={classes.label}>{label}</Typography>
+        <StateIcon state={state} />
+      </div>
+      <Tooltip title={reason ?? ''}>
+        <Typography
+          className={classes.value}
+          style={color ? { color } : undefined}
+          color={state === 'unknown' ? 'textSecondary' : 'textPrimary'}
+        >
+          {failed ? 'unavailable' : <ValueText text={value} />}
         </Typography>
       </Tooltip>
-      <div className={classes.context}>{context}</div>
+      <div className={classes.context}>
+        {color ? (
+          <span className={classes.reason} style={{ color }} title={reason}>
+            {reason}
+          </span>
+        ) : (
+          context
+        )}
+      </div>
       <div className={classes.visual}>{visual}</div>
     </Box>
   );
 };
 
-// Share of a limit: the fill carries severity, the track is a lighter step
-// of the same colour.
-const Meter = ({ percent, label }: { percent: number | null; label: string }) => {
+// Share of a limit. Informational: no platform-wide "too high" threshold
+// exists yet, so the fill stays the neutral accent at any value.
+const Meter = ({ percent, label }: { percent: number; label: string }) => {
   const classes = useStyles();
   const theme = useTheme();
-  if (percent === null) return null;
-  const severity = utilizationSeverity(percent);
-  const color = {
-    normal: theme.palette.primary.main,
-    warning: theme.palette.warning.main,
-    critical: theme.palette.error.main,
-  }[severity];
+  const color = theme.palette.primary.main;
   return (
     <div
       className={classes.meterTrack}
@@ -243,14 +291,32 @@ const Meter = ({ percent, label }: { percent: number | null; label: string }) =>
   );
 };
 
-const SeverityNote = ({ severity, children }: { severity: Severity; children: ReactNode }) => {
-  if (severity === 'critical') return <StatusError>{children}</StatusError>;
-  if (severity === 'warning') return <StatusWarning>{children}</StatusWarning>;
-  return <>{children}</>;
+// One dot per desired replica, filled when available: the replica count at
+// a glance, missing ones outlined in the tile's status colour.
+const ReplicaPips = ({ replicas, state }: { replicas: ObservabilitySummary['replicas']; state: MetricState }) => {
+  const classes = useStyles();
+  const theme = useTheme();
+  if (!replicas || replicas.desired === 0 || replicas.desired > 12) return null;
+  const missing = stateColor(theme, state) ?? theme.palette.text.disabled;
+  return (
+    <div className={classes.pips} aria-hidden>
+      {Array.from({ length: replicas.desired }, (_, i) => (
+        <span
+          key={i}
+          className={classes.pip}
+          style={
+            i < replicas.available
+              ? { backgroundColor: theme.palette.success.main }
+              : { border: `2px solid ${missing}` }
+          }
+        />
+      ))}
+    </div>
+  );
 };
 
-const HealthStatus = ({ summary }: { summary: ObservabilitySummary }) => {
-  switch (metricsHealth(summary)) {
+const HealthStatus = ({ health }: { health: HealthEvaluation }) => {
+  switch (health.overall) {
     case 'healthy':
       return <StatusOK>Healthy</StatusOK>;
     case 'degraded':
@@ -258,37 +324,52 @@ const HealthStatus = ({ summary }: { summary: ObservabilitySummary }) => {
     case 'scaled-to-zero':
       return <StatusWarning>Scaled to zero</StatusWarning>;
     default:
-      return <StatusPending>No data</StatusPending>;
+      return (
+        <Box display="flex" alignItems="center" style={{ gap: 6 }}>
+          <HelpOutlineIcon fontSize="small" color="disabled" />
+          <Typography variant="body2" color="textSecondary" component="span">
+            Unknown
+          </Typography>
+        </Box>
+      );
   }
 };
 
-// The rule behind the status, shown on hover/focus: why it's in this state
-// right now, then the fixed thresholds. Keeps the card free of footnotes.
-const HealthExplanation = ({ summary }: { summary: ObservabilitySummary }) => {
+const LEAD: Record<HealthEvaluation['overall'], string> = {
+  healthy: 'Healthy:',
+  degraded: 'Degraded because:',
+  'scaled-to-zero': 'Scaled to zero:',
+  unknown: 'Unknown because:',
+};
+
+// Why the status is what it is right now, then the fixed rule.
+const HealthExplanation = ({ health, rateWindow }: { health: HealthEvaluation; rateWindow: string }) => {
   const classes = useStyles();
   return (
     <div className={classes.explanation}>
-      <Typography variant="body2" className={classes.explanationLead}>
-        {healthReason(summary)}
+      <Typography variant="body2" className={classes.explanationLead} component="div">
+        {LEAD[health.overall]}
+        <ul>
+          {health.reasons.map(r => (
+            <li key={r}>{r}</li>
+          ))}
+        </ul>
       </Typography>
       <Typography variant="body2">
         <b>Degraded</b> when fewer replicas are available than desired, or 5xx responses reach{' '}
-        {ERROR_RATE_DEGRADED_PERCENT}% of requests over {summary.rateWindow}.
-      </Typography>
-      <Typography variant="body2">
-        CPU and memory are a share of the containers' limits: amber at {UTILIZATION_WARNING_PERCENT}%, red at{' '}
-        {UTILIZATION_CRITICAL_PERCENT}%.
+        {ERROR_RATE_DEGRADED_PERCENT}% of requests over {rateWindow}. Restarts are flagged but don't degrade the
+        service on their own.
       </Typography>
       <Typography variant="body2">Trends cover the last 30 minutes.</Typography>
     </div>
   );
 };
 
-const HealthIndicator = ({ summary }: { summary: ObservabilitySummary }) => {
+const HealthIndicator = ({ health, rateWindow }: { health: HealthEvaluation; rateWindow: string }) => {
   const classes = useStyles();
   return (
     <Tooltip
-      title={<HealthExplanation summary={summary} />}
+      title={<HealthExplanation health={health} rateWindow={rateWindow} />}
       placement="bottom-end"
       arrow
       interactive
@@ -296,17 +377,18 @@ const HealthIndicator = ({ summary }: { summary: ObservabilitySummary }) => {
     >
       {/* A button so keyboard users can focus it and get the tooltip too. */}
       <button type="button" className={classes.healthTrigger}>
-        <HealthStatus summary={summary} />
+        <HealthStatus health={health} />
       </button>
     </Tooltip>
   );
 };
 
-const Signals = ({ summary }: { summary: ObservabilitySummary }) => {
+const Signals = ({ summary, health }: { summary: ObservabilitySummary; health: HealthEvaluation }) => {
   const classes = useStyles();
-  const off = (key: string) => summary.unavailable.includes(key);
+  const theme = useTheme();
+  const { metrics } = health;
   const end = Math.floor(Date.parse(summary.generatedAt) / 1000);
-  const trend = (key: SeriesKey, label: string, format: (v: number) => string) => (
+  const trend = (key: SeriesKey, label: string, format: (v: number) => string, evaluation: MetricEvaluation) => (
     <Sparkline
       label={label}
       points={summary.series?.points?.[key] ?? []}
@@ -314,30 +396,16 @@ const Signals = ({ summary }: { summary: ObservabilitySummary }) => {
       rangeSeconds={SERIES_RANGE_SECONDS}
       end={end}
       format={format}
+      accent={stateColor(theme, evaluation.state) ?? undefined}
     />
   );
-  const noTraffic = `No traffic in the last ${summary.rateWindow}`;
-
-  const errorSeverity: Severity =
-    summary.errorRatePercent !== null && summary.errorRatePercent >= ERROR_RATE_DEGRADED_PERCENT
-      ? 'critical'
-      : 'normal';
-  const cpuSeverity = utilizationSeverity(summary.cpuUtilizationPercent);
-  const memorySeverity = utilizationSeverity(summary.memoryUtilizationPercent);
-  // Meter plus words; the words switch to a status once past a threshold.
-  const utilizationContext = (percent: number | null, severity: Severity, label: string) =>
+  const ofLimit = (percent: number | null, label: string) =>
     percent === null ? null : (
       <>
         <Meter percent={percent} label={label} />
-        <SeverityNote severity={severity}>
-          {severity === 'normal' ? 'of limit' : `≥ ${severity === 'critical' ? UTILIZATION_CRITICAL_PERCENT : UTILIZATION_WARNING_PERCENT}% of limit`}
-        </SeverityNote>
+        of limit
       </>
     );
-
-  const replicas = summary.replicas;
-  const replicaShort = replicas !== null && replicas.available < replicas.desired;
-  const restarts = summary.restarts1h;
 
   return (
     <>
@@ -347,83 +415,75 @@ const Signals = ({ summary }: { summary: ObservabilitySummary }) => {
           <Tile
             label="Request rate"
             value={formatRate(summary.requestRate)}
-            unavailable={off('requestRate')}
-            blankHint="Not scraped by Prometheus"
+            evaluation={metrics.requestRate}
             context={`${summary.rateWindow} rate`}
-            visual={trend('requestRate', 'Request rate', formatRate)}
+            visual={trend('requestRate', 'Request rate', formatRate, metrics.requestRate)}
           />
         </Grid>
         <Grid item xs={12} sm={4}>
           <Tile
             label="Error rate"
             value={formatPercent(summary.errorRatePercent)}
-            unavailable={off('errorRatePercent')}
-            blankHint={noTraffic}
-            context={
-              <SeverityNote severity={errorSeverity}>
-                {errorSeverity === 'critical' ? `≥ ${ERROR_RATE_DEGRADED_PERCENT}% 5xx responses` : '5xx responses'}
-              </SeverityNote>
-            }
-            visual={trend('errorRatePercent', 'Error rate', formatPercent)}
+            evaluation={metrics.errorRate}
+            context="5xx responses"
+            visual={trend('errorRatePercent', 'Error rate', formatPercent, metrics.errorRate)}
           />
         </Grid>
         <Grid item xs={12} sm={4}>
           <Tile
             label="P95 latency"
             value={formatLatency(summary.p95LatencySeconds)}
-            unavailable={off('p95LatencySeconds')}
-            blankHint={noTraffic}
+            evaluation={metrics.p95Latency}
             context={`${summary.rateWindow} window`}
-            visual={trend('p95LatencySeconds', 'P95 latency', formatLatency)}
+            visual={trend('p95LatencySeconds', 'P95 latency', formatLatency, metrics.p95Latency)}
           />
         </Grid>
       </Grid>
 
       <Box mt={3}>
-        <Typography className={classes.section}>Resources</Typography>
+        <Typography className={classes.section}>Resources & workload</Typography>
       </Box>
       <Grid container spacing={2} alignItems="stretch">
         <Grid item xs={12} sm={4}>
           <Tile
             label="CPU"
             value={formatPercent(summary.cpuUtilizationPercent)}
-            unavailable={off('cpuUtilizationPercent')}
-            blankHint="No CPU limit set"
-            context={utilizationContext(summary.cpuUtilizationPercent, cpuSeverity, 'CPU')}
-            visual={trend('cpuUtilizationPercent', 'CPU', formatPercent)}
+            evaluation={metrics.cpu}
+            context={ofLimit(summary.cpuUtilizationPercent, 'CPU')}
+            visual={trend('cpuUtilizationPercent', 'CPU', formatPercent, metrics.cpu)}
           />
         </Grid>
         <Grid item xs={12} sm={4}>
           <Tile
             label="Memory"
             value={formatPercent(summary.memoryUtilizationPercent)}
-            unavailable={off('memoryUtilizationPercent')}
-            blankHint="No memory limit set"
-            context={utilizationContext(summary.memoryUtilizationPercent, memorySeverity, 'Memory')}
-            visual={trend('memoryUtilizationPercent', 'Memory', formatPercent)}
+            evaluation={metrics.memory}
+            context={ofLimit(summary.memoryUtilizationPercent, 'Memory')}
+            visual={trend('memoryUtilizationPercent', 'Memory', formatPercent, metrics.memory)}
           />
         </Grid>
+        {/* Third column split in two, so restarts get their own state while
+            the columns still line up with the Traffic row. */}
         <Grid item xs={12} sm={4}>
-          <Tile
-            label="Replicas"
-            value={formatReplicas(replicas)}
-            unavailable={off('replicasAvailable') || off('replicasDesired')}
-            blankHint="No Deployment found in this environment"
-            context={
-              replicaShort ? <StatusError>Fewer available than desired</StatusError> : 'available / desired'
-            }
-            visual={
-              <div className={classes.inlineStat}>
-                <Typography className={classes.label}>Restarts in the last hour</Typography>
-                <Box display="flex" alignItems="center">
-                  {restarts !== null && restarts > 0 && <StatusWarning />}
-                  <Typography className={classes.inlineValue} color={off('restarts1h') ? 'textSecondary' : 'textPrimary'}>
-                    {off('restarts1h') ? 'unavailable' : formatCount(restarts)}
-                  </Typography>
-                </Box>
-              </div>
-            }
-          />
+          <Box display="flex" height="100%" style={{ gap: 16 }}>
+            <Box flex={1} minWidth={0}>
+              <Tile
+                label="Replicas"
+                value={formatReplicas(summary.replicas)}
+                evaluation={metrics.replicas}
+                context="available / desired"
+                visual={<ReplicaPips replicas={summary.replicas} state={metrics.replicas.state} />}
+              />
+            </Box>
+            <Box flex={1} minWidth={0}>
+              <Tile
+                label="Restarts 1h"
+                value={formatCount(summary.restarts1h)}
+                evaluation={metrics.restarts}
+                context="container restarts"
+              />
+            </Box>
+          </Box>
         </Grid>
       </Grid>
     </>
@@ -470,10 +530,11 @@ export const MetricsCard = ({
   const classes = useStyles();
   const { summary, error, updatedAt, loading } = useObservabilitySummary(component, environment);
   const grafanaUrl = serviceOverviewUrl(grafanaUiUrl, component, environment);
+  const health = summary ? evaluateHealth(summary) : null;
 
   let body;
-  if (summary) {
-    body = <Signals summary={summary} />;
+  if (summary && health) {
+    body = <Signals summary={summary} health={health} />;
   } else if (loading) {
     body = <Progress />;
   } else {
@@ -484,9 +545,9 @@ export const MetricsCard = ({
     <InfoCard
       title={environment}
       action={
-        summary ? (
+        summary && health ? (
           <Box pt={2} pr={2}>
-            <HealthIndicator summary={summary} />
+            <HealthIndicator health={health} rateWindow={summary.rateWindow} />
           </Box>
         ) : undefined
       }
@@ -513,9 +574,8 @@ export const MetricsCard = ({
 
 // The Metrics tab (OBSERVABILLITY_PART4.md Part 3): one golden-signals card
 // per environment the component is deployed to — the same environment list
-// as the Deployments tab (useDeployments), not a second definition. Health:
-// Degraded when available < desired replicas or the error rate is at or
-// above ERROR_RATE_DEGRADED_PERCENT; see metricsHealth.
+// as the Deployments tab (useDeployments), not a second definition. Overall
+// health and per-tile states come from evaluateHealth (health.ts).
 export const MetricsContent = () => {
   const { entity } = useEntity();
   const grafanaUiUrl = useGrafanaUiUrl();
