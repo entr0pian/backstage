@@ -9,6 +9,7 @@ import {
 import { NavContentBlueprint } from '@backstage/plugin-app-react';
 import { SidebarLogo } from './SidebarLogo';
 import MenuIcon from '@material-ui/icons/Menu';
+import HomeOutlinedIcon from '@material-ui/icons/HomeOutlined';
 import SearchIcon from '@material-ui/icons/Search';
 import { SidebarSearchModal } from '@backstage/plugin-search';
 import { UserSettingsSignInAvatar } from '@backstage/plugin-user-settings';
@@ -39,7 +40,9 @@ export const SidebarContent = NavContentBlueprint.make({
           </SidebarGroup>
           <SidebarDivider />
           <SidebarGroup label="Menu" icon={<MenuIcon />}>
-            {nav.take('page:app/home')}
+            {/* The Home page (modules/home) at `/`; added by hand so it
+                always sits first. */}
+            <SidebarItem icon={HomeOutlinedIcon} to="/" text="Home" />
             {nav.take('page:catalog')}
             <IfAllowed permission={taskCreatePermission}>
               {nav.take('page:scaffolder')}

@@ -21,10 +21,14 @@ import { shortVersion } from '../platformUi';
 import { brand } from '../theme/themes';
 
 const useStyles = makeStyles(theme => ({
+  // Inset and rounded like the cards below it, so the page reads as one
+  // column rather than a full-bleed banner over an inset body.
+  root: { padding: theme.spacing(2.5, 3, 0) },
   band: {
     position: 'relative',
     overflow: 'hidden',
     color: '#fff',
+    borderRadius: 16,
     padding: theme.spacing(3, 4, 2.5),
     backgroundImage: `linear-gradient(120deg, ${brand.indigoDeep} 0%, ${brand.indigo} 50%, ${brand.cyanDeep} 100%)`,
     '&::after': {
@@ -82,10 +86,11 @@ const useStyles = makeStyles(theme => ({
   tabs: {
     display: 'flex',
     gap: theme.spacing(0.5),
-    padding: theme.spacing(0, 3),
+    padding: theme.spacing(0, 1),
+    marginTop: theme.spacing(1),
     borderBottom: `1px solid ${theme.palette.divider}`,
-    backgroundColor: theme.palette.background.paper,
     overflowX: 'auto',
+    overflowY: 'hidden',
   },
   tab: {
     display: 'inline-flex',
@@ -170,7 +175,7 @@ export const ServiceHeader = ({ tabs, activeTabId }: EntityHeaderLayoutProps) =>
   const base = `/catalog/${entity.metadata.namespace ?? 'default'}/component/${name}`;
 
   return (
-    <header>
+    <header className={classes.root}>
       <div className={classes.band}>
         <div className={classes.top}>
           <div>
