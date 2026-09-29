@@ -10,7 +10,7 @@ import {
   shapes,
 } from '@backstage/theme';
 
-const brand = {
+export const brand = {
   indigo: '#6366f1',
   indigoDeep: '#4f46e5',
   indigoLight: '#818cf8',

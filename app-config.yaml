@@ -6,10 +6,8 @@ app:
   packages: all
 
   extensions:
-    # Configure the catalog index page to be the root page, this is normally mounted on /catalog
-    - page:catalog:
-        config:
-          path: /
+    # `/` is the platform Home page (packages/app/src/modules/home); the
+    # catalog index stays on its default /catalog.
 
     # Disable stock Backstage Catalog cards that are empty/near-empty for
     # every service here today (no APIs registered, no manual System/Domain

@@ -39,6 +39,7 @@ export const SidebarContent = NavContentBlueprint.make({
           </SidebarGroup>
           <SidebarDivider />
           <SidebarGroup label="Menu" icon={<MenuIcon />}>
+            {nav.take('page:app/home')}
             {nav.take('page:catalog')}
             <IfAllowed permission={taskCreatePermission}>
               {nav.take('page:scaffolder')}

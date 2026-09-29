@@ -51,6 +51,8 @@ export interface Deployment {
   lastDeployed: string | null;
   namespace: string | null;
   server: string | null;
+  // Argo CD's sync history for this environment, newest first (at most 5).
+  history: { revision: string | null; deployedAt: string | null }[];
 }
 
 const ENVIRONMENT_LABEL = PLATFORM_LABELS.environment;
@@ -65,6 +67,7 @@ function emptyDelivery(): Pick<
   | 'lastDeployed'
   | 'namespace'
   | 'server'
+  | 'history'
 > {
   return {
     argoApplicationName: null,
@@ -75,6 +78,7 @@ function emptyDelivery(): Pick<
     lastDeployed: null,
     namespace: null,
     server: null,
+    history: [],
   };
 }
 
@@ -100,6 +104,10 @@ function deliveryFrom(app: ArgoApplication): ReturnType<typeof emptyDelivery> {
       latest?.deployedAt ?? app.status?.operationState?.finishedAt ?? null,
     namespace: app.spec?.destination?.namespace ?? null,
     server: app.spec?.destination?.server ?? null,
+    history: history
+      .slice(-5)
+      .reverse()
+      .map(h => ({ revision: h.revision ?? h.revisions?.[0] ?? null, deployedAt: h.deployedAt ?? null })),
   };
 }
 

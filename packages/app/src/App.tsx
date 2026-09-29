@@ -9,6 +9,8 @@ import { themeModule } from './modules/theme';
 import { platformActionsModule } from './modules/platformActions';
 import { deploymentsModule } from './modules/deployments';
 import { metricsModule } from './modules/metrics';
+import { homeModule } from './modules/home';
+import { serviceHeaderModule } from './modules/serviceHeader';
 import { dependenciesModule } from './modules/dependencies';
 import { databasesModule } from './modules/databases';
 import { createDeploymentModule } from './modules/createDeployment';
@@ -23,6 +25,8 @@ export default createApp({
     platformActionsModule,
     deploymentsModule,
     metricsModule,
+    homeModule,
+    serviceHeaderModule,
     dependenciesModule,
     databasesModule,
     createDeploymentModule,

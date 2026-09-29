@@ -69,6 +69,7 @@ function deploymentsIn(...environments: string[]) {
       lastDeployed: null,
       namespace: environment,
       server: null,
+      history: [],
     })),
   });
 }

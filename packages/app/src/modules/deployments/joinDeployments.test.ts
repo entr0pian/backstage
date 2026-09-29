@@ -9,6 +9,7 @@ const noDelivery = {
   lastDeployed: null,
   namespace: null,
   server: null,
+  history: [],
 };
 
 describe('joinDeployments', () => {
@@ -47,6 +48,11 @@ describe('joinDeployments', () => {
         lastDeployed: '2026-09-24T07:47:00Z',
         namespace: 'management',
         server: 'https://kubernetes.default.svc',
+        // Newest first.
+        history: [
+          { revision: '1078eb1', deployedAt: '2026-09-24T07:47:00Z' },
+          { revision: 'aaaaaaa', deployedAt: '2026-09-24T07:00:00Z' },
+        ],
       },
     ]);
   });
