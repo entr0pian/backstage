@@ -188,7 +188,43 @@ const components = (mode: Mode) => {
         root: { fontWeight: 500 },
       },
     },
-  };
+    // The catalog's Personal / All list: the stock grey panel becomes a
+    // plain bordered card like the rest of the portal, with a brand-tinted
+    // selected row.
+    CatalogReactUserListPicker: {
+      styleOverrides: {
+        root: {
+          backgroundColor: dark ? '#121829' : '#ffffff',
+          border: `1px solid ${border}`,
+          borderRadius: 12,
+          boxShadow: 'none',
+          padding: 8,
+        },
+        title: {
+          color: muted,
+          fontSize: '0.68rem',
+          fontWeight: 700,
+          letterSpacing: '0.08em',
+          padding: '8px 8px 4px',
+        },
+        groupWrapper: {
+          boxShadow: 'none',
+          border: 0,
+          backgroundColor: 'transparent',
+          margin: 0,
+        },
+        menuItem: {
+          borderRadius: 8,
+          minHeight: 38,
+          '&.Mui-selected, &.Mui-selected:hover': {
+            backgroundColor: dark ? 'rgba(129, 140, 248, 0.16)' : 'rgba(99, 102, 241, 0.1)',
+            color: dark ? brand.indigoLight : brand.indigoDeep,
+            fontWeight: 600,
+          },
+        },
+      },
+    },
+  } as Record<string, unknown>;
 };
 
 export const lightTheme = createUnifiedTheme({

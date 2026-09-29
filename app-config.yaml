@@ -7,7 +7,10 @@ app:
 
   extensions:
     # `/` is the platform Home page (packages/app/src/modules/home); the
-    # catalog index stays on its default /catalog.
+    # catalog index stays on its default /catalog, as the platform's own
+    # page (modules/catalog), which renders a guest-aware "Personal" list
+    # picker itself — so the stock one is off.
+    - catalog-filter:catalog/list: false
 
     # Disable stock Backstage Catalog cards that are empty/near-empty for
     # every service here today (no APIs registered, no manual System/Domain

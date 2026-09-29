@@ -12,6 +12,7 @@ import { metricsModule } from './modules/metrics';
 import { homeModule } from './modules/home';
 import { serviceHeaderModule } from './modules/serviceHeader';
 import { readOnlyModule } from './modules/readOnly';
+import { catalogIndexModule } from './modules/catalog';
 import { dependenciesModule } from './modules/dependencies';
 import { databasesModule } from './modules/databases';
 import { createDeploymentModule } from './modules/createDeployment';
@@ -29,6 +30,7 @@ export default createApp({
     homeModule,
     serviceHeaderModule,
     readOnlyModule,
+    catalogIndexModule,
     dependenciesModule,
     databasesModule,
     createDeploymentModule,
