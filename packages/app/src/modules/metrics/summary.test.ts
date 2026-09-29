@@ -3,6 +3,7 @@ import {
   formatLatency,
   formatPercent,
   formatRate,
+  healthReason,
   metricsHealth,
   type ObservabilitySummary,
 } from './summary';
@@ -18,6 +19,18 @@ const base: ObservabilitySummary = {
   replicas: { available: 1, desired: 1 },
   restarts1h: 0,
   unavailable: [],
+  generatedAt: '2026-09-29T12:00:00Z',
+  rateWindow: '2m',
+  series: {
+    stepSeconds: 30,
+    points: {
+      requestRate: [],
+      errorRatePercent: [],
+      p95LatencySeconds: [],
+      cpuUtilizationPercent: [],
+      memoryUtilizationPercent: [],
+    },
+  },
 };
 
 describe('metricsHealth', () => {
@@ -28,6 +41,15 @@ describe('metricsHealth', () => {
     expect(metricsHealth({ ...base, replicas: { available: 0, desired: 1 } })).toBe('degraded');
     expect(metricsHealth({ ...base, replicas: { available: 0, desired: 0 } })).toBe('scaled-to-zero');
     expect(metricsHealth({ ...base, replicas: null })).toBe('no-data');
+  });
+});
+
+describe('healthReason', () => {
+  it('says why the status is what it is', () => {
+    expect(healthReason(base)).toBe('1 of 1 replicas available, 0% 5xx over 2m.');
+    expect(healthReason({ ...base, errorRatePercent: null })).toBe('1 of 1 replicas available, no traffic in the last 2m.');
+    expect(healthReason({ ...base, replicas: null })).toBe('No platform Deployment found in this environment.');
+    expect(healthReason({ ...base, replicas: { available: 0, desired: 0 } })).toBe('The Deployment is scaled to 0 replicas.');
   });
 });
 

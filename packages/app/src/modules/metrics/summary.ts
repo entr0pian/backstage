@@ -1,9 +1,21 @@
 // Mirrors the backend's ObservabilitySummary
 // (packages/backend/src/modules/observabilitySummary/ObservabilitySummary.ts).
 // null = no data (no traffic, no limit, no deployment), never 0.
+export type Point = [unixSeconds: number, value: number];
+
+export type SeriesKey =
+  | 'requestRate'
+  | 'errorRatePercent'
+  | 'p95LatencySeconds'
+  | 'cpuUtilizationPercent'
+  | 'memoryUtilizationPercent';
+
 export interface ObservabilitySummary {
   component: string;
   environment: string;
+  generatedAt: string;
+  // Window of the rate/latency values, e.g. "2m".
+  rateWindow: string;
   requestRate: number | null;
   errorRatePercent: number | null;
   p95LatencySeconds: number | null;
@@ -13,10 +25,23 @@ export interface ObservabilitySummary {
   restarts1h: number | null;
   // Metrics whose query failed (as opposed to returning no data).
   unavailable: string[];
+  // Last 30 minutes per metric, for the sparklines.
+  series: { stepSeconds: number; points: Record<SeriesKey, Point[]> };
 }
 
 // Error-rate threshold for the Degraded state. Not an SLO, just a line.
 export const ERROR_RATE_DEGRADED_PERCENT = 5;
+
+// CPU/memory share of the limit at which the meter turns warning / critical.
+export const UTILIZATION_WARNING_PERCENT = 75;
+export const UTILIZATION_CRITICAL_PERCENT = 90;
+
+export type Severity = 'normal' | 'warning' | 'critical';
+
+export function utilizationSeverity(percent: number | null): Severity {
+  if (percent === null || percent < UTILIZATION_WARNING_PERCENT) return 'normal';
+  return percent < UTILIZATION_CRITICAL_PERCENT ? 'warning' : 'critical';
+}
 
 export type MetricsHealth = 'healthy' | 'degraded' | 'scaled-to-zero' | 'no-data';
 
@@ -34,6 +59,19 @@ export function metricsHealth(summary: ObservabilitySummary): MetricsHealth {
     return 'degraded';
   }
   return 'healthy';
+}
+
+// Why metricsHealth() said what it said, in words, for the status tooltip.
+export function healthReason(summary: ObservabilitySummary): string {
+  const { replicas, errorRatePercent, rateWindow } = summary;
+  if (!replicas) return 'No platform Deployment found in this environment.';
+  if (replicas.desired === 0) return 'The Deployment is scaled to 0 replicas.';
+  const replicaText = `${replicas.available} of ${replicas.desired} replicas available`;
+  const errorText =
+    errorRatePercent === null
+      ? `no traffic in the last ${rateWindow}`
+      : `${formatPercent(errorRatePercent)} 5xx over ${rateWindow}`;
+  return `${replicaText}, ${errorText}.`;
 }
 
 export const NO_DATA = '—';

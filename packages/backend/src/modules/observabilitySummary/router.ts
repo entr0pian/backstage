@@ -6,14 +6,14 @@ import {
   PrometheusUnavailableError,
   readObservabilitySummary,
 } from './ObservabilitySummary';
-import type { InstantQueryClient } from './PrometheusClient';
+import type { PrometheusQueryClient } from './PrometheusClient';
 
 // The Metrics tab's one route. The only inputs are the two path segments;
 // query-string parameters are ignored, so there is no way to hand this
 // route PromQL, a metric name or a Prometheus API path. Guest-safe: the
 // response is a handful of aggregate numbers per component/environment.
 export function createObservabilityRouter(options: {
-  prometheus: InstantQueryClient;
+  prometheus: PrometheusQueryClient;
   logger: LoggerService;
 }): ExpressRouter {
   const { prometheus, logger } = options;
@@ -28,6 +28,8 @@ export function createObservabilityRouter(options: {
         return;
       }
       try {
+        // Polled every few seconds by the Metrics tab: never serve a cached copy.
+        res.set('Cache-Control', 'no-store');
         res.json(await readObservabilitySummary(prometheus, component, environment));
       } catch (err) {
         if (err instanceof PrometheusUnavailableError) {

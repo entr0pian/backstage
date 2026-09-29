@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import {
   createExtensionTester,
   mockApis,
@@ -34,6 +34,22 @@ function summary(environment: string, overrides: Partial<ObservabilitySummary> =
     replicas: { available: 2, desired: 2 },
     restarts1h: 0,
     unavailable: [],
+    generatedAt: '2026-09-29T12:00:00Z',
+    rateWindow: '2m',
+    series: {
+      stepSeconds: 30,
+      points: {
+        requestRate: [
+          [1790683140, 10],
+          [1790683170, 11],
+          [1790683200, 12.4],
+        ],
+        errorRatePercent: [],
+        p95LatencySeconds: [],
+        cpuUtilizationPercent: [],
+        memoryUtilizationPercent: [],
+      },
+    },
     ...overrides,
   };
 }
@@ -86,6 +102,10 @@ function render(responses: Record<string, ObservabilitySummary | Error>) {
 const card = (environment: string) =>
   screen.getByText(environment).closest('.MuiCard-root') as HTMLElement;
 
+// A tile's value as read on screen (number and unit are separate spans).
+const valueOf = (c: HTMLElement, label: string) =>
+  within(c).getByText(label).nextElementSibling?.textContent;
+
 describe('Metrics tab', () => {
   it('is a Metrics tab in the observability group, for service Components only', () => {
     const tester = createExtensionTester(metricsContent);
@@ -112,10 +132,16 @@ describe('Metrics tab', () => {
   it('renders the golden signals from the backend response', async () => {
     deploymentsIn('management');
     render({ management: summary('management', { restarts1h: 3 }) });
-    const c = await waitFor(() => within(card('management')).getByText('12.4 req/s') && card('management'));
-    for (const text of ['0%', '42 ms', '18%', '41%', '2 / 2', '3']) {
-      expect(within(c).getByText(text)).toBeInTheDocument();
-    }
+    await waitFor(() => expect(screen.getByText('Healthy')).toBeInTheDocument());
+    const c = card('management');
+    expect(valueOf(c, 'Request rate')).toBe('12.4req/s');
+    expect(valueOf(c, 'Error rate')).toBe('0%');
+    expect(valueOf(c, 'P95 latency')).toBe('42ms');
+    expect(valueOf(c, 'CPU')).toBe('18%');
+    expect(valueOf(c, 'Memory')).toBe('41%');
+    expect(valueOf(c, 'Replicas')).toBe('2 / 2');
+    expect(valueOf(c, 'Restarts in the last hour')).toBe('3');
+    expect(within(c).getAllByRole('meter')).toHaveLength(2);
   });
 
   it('shows missing metrics as no data, not zero', async () => {
@@ -132,9 +158,12 @@ describe('Metrics tab', () => {
     });
     await waitFor(() => expect(screen.getByText('No data')).toBeInTheDocument());
     const c = card('management');
-    expect(within(c).getByText('0 req/s')).toBeInTheDocument();
-    expect(within(c).getAllByText('—')).toHaveLength(4);
-    expect(within(c).getByText('unavailable')).toBeInTheDocument();
+    expect(valueOf(c, 'Request rate')).toBe('0req/s');
+    for (const label of ['Error rate', 'P95 latency', 'CPU', 'Replicas']) {
+      expect(valueOf(c, label)).toBe('—');
+    }
+    expect(valueOf(c, 'Restarts in the last hour')).toBe('unavailable');
+    expect(within(c).queryAllByRole('meter')).toHaveLength(1);
   });
 
   it('flags a replica shortfall as Degraded', async () => {
@@ -148,7 +177,7 @@ describe('Metrics tab', () => {
     render({ dev: new Error('Metrics are unavailable right now'), management: summary('management') });
     await waitFor(() => expect(screen.getByText('Healthy')).toBeInTheDocument());
     expect(within(card('dev')).getByText('Metrics are unavailable right now')).toBeInTheDocument();
-    expect(within(card('management')).getByText('12.4 req/s')).toBeInTheDocument();
+    expect(valueOf(card('management'), 'Request rate')).toBe('12.4req/s');
   });
 
   it('links each card to Service Overview with its component and environment', async () => {
@@ -162,5 +191,47 @@ describe('Metrics tab', () => {
       expect(url.searchParams.get('var-component')).toBe('payments');
       expect(url.searchParams.get('var-environment')).toBe(environment);
     }
+  });
+
+  it('draws a trend with a readable summary and a keyboard tooltip', async () => {
+    deploymentsIn('management');
+    render({ management: summary('management') });
+    await waitFor(() => expect(screen.getByText('Healthy')).toBeInTheDocument());
+    const trend = screen.getByRole('slider', { name: /request rate, last 30 minutes/i });
+    expect(trend).toHaveAccessibleName(/min 10 req\/s, max 12\.4 req\/s, latest 12\.4 req\/s/i);
+    fireEvent.focus(trend);
+    expect(within(trend).getByRole('status')).toHaveTextContent('12.4 req/s');
+    fireEvent.keyDown(trend, { key: 'ArrowLeft' });
+    expect(within(trend).getByRole('status')).toHaveTextContent('11 req/s');
+    expect(trend).toHaveAttribute('aria-valuetext', expect.stringContaining('11 req/s'));
+    expect(within(card('management')).getAllByText(/no data in the last 30 min/i)).toHaveLength(4);
+  });
+
+  it('refreshes every 15 seconds and keeps values on screen', async () => {
+    jest.useFakeTimers();
+    try {
+      deploymentsIn('management');
+      const { fetch } = render({ management: summary('management') });
+      await waitFor(() => expect(screen.getByText('Healthy')).toBeInTheDocument());
+      expect(fetch).toHaveBeenCalledTimes(1);
+      expect(screen.getByText(/live · updated/i)).toBeInTheDocument();
+      await act(async () => {
+        jest.advanceTimersByTime(15_000);
+      });
+      await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
+      expect(valueOf(card('management'), 'Request rate')).toBe('12.4req/s');
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('explains the health status on hover instead of a footnote', async () => {
+    deploymentsIn('management');
+    render({ management: summary('management') });
+    await waitFor(() => expect(screen.getByText('Healthy')).toBeInTheDocument());
+    expect(screen.queryByText(/trends cover the last 30 minutes/i)).not.toBeInTheDocument();
+    fireEvent.mouseOver(screen.getByText('Healthy'));
+    expect(await screen.findByText('2 of 2 replicas available, 0% 5xx over 2m.')).toBeInTheDocument();
+    expect(screen.getByText(/trends cover the last 30 minutes/i)).toBeInTheDocument();
   });
 });

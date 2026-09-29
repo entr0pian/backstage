@@ -16,6 +16,16 @@ export function isValidIdentity(value: string): boolean {
   return LABEL_VALUE.test(value);
 }
 
+// HTTP series are scraped every 30s; 2m (4 samples) is the shortest window
+// that stays stable through a missed scrape, and is what Grafana's
+// $__rate_interval resolves to on the Service Overview dashboard's default
+// 1h range — so both show the same number.
+export const RATE_WINDOW = '2m';
+
+// The trend each sparkline shows: the last 30 minutes at the scrape interval.
+export const SERIES_RANGE_SECONDS = 30 * 60;
+export const SERIES_STEP_SECONDS = 30;
+
 export type MetricKey =
   | 'requestRate'
   | 'errorRatePercent'
@@ -25,6 +35,16 @@ export type MetricKey =
   | 'replicasAvailable'
   | 'replicasDesired'
   | 'restarts1h';
+
+// The metrics that also get a trend series (same query, as a range query).
+export const SERIES_KEYS = [
+  'requestRate',
+  'errorRatePercent',
+  'p95LatencySeconds',
+  'cpuUtilizationPercent',
+  'memoryUtilizationPercent',
+] as const satisfies readonly MetricKey[];
+export type SeriesKey = (typeof SERIES_KEYS)[number];
 
 // Each query returns a single scalar-like sample, or nothing when there's
 // no data — which stays null rather than becoming 0:
@@ -40,12 +60,12 @@ export function buildQueries(component: string, environment: string): Record<Met
   }
   const s = `component="${component}", environment="${environment}"`;
   return {
-    requestRate: `sum(rate(http_requests_total{${s}}[5m])) or 0 * sum(up{${s}})`,
+    requestRate: `sum(rate(http_requests_total{${s}}[${RATE_WINDOW}])) or 0 * sum(up{${s}})`,
     errorRatePercent:
-      `100 * (sum(rate(http_requests_total{${s}, status=~"5.."}[5m])) or vector(0))` +
-      ` / (sum(rate(http_requests_total{${s}}[5m])) > 0)`,
+      `100 * (sum(rate(http_requests_total{${s}, status=~"5.."}[${RATE_WINDOW}])) or vector(0))` +
+      ` / (sum(rate(http_requests_total{${s}}[${RATE_WINDOW}])) > 0)`,
     p95LatencySeconds:
-      `histogram_quantile(0.95, sum by (le) (rate(http_request_duration_seconds_bucket{${s}}[5m]))) >= 0`,
+      `histogram_quantile(0.95, sum by (le) (rate(http_request_duration_seconds_bucket{${s}}[${RATE_WINDOW}]))) >= 0`,
     // Usage only of containers that have a limit, over the sum of limits.
     cpuUtilizationPercent:
       `100 * sum(platform:container_cpu_usage_cores{${s}}` +

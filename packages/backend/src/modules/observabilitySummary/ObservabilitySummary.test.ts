@@ -3,20 +3,30 @@ import type { AddressInfo } from 'node:net';
 import type { LoggerService } from '@backstage/backend-plugin-api';
 import { buildQueries, isValidIdentity, type MetricKey } from './ObservabilityQueries';
 import { readObservabilitySummary } from './ObservabilitySummary';
-import type { InstantQueryClient } from './PrometheusClient';
+import type { Point, PrometheusQueryClient } from './PrometheusClient';
 import { createObservabilityRouter } from './router';
 
 // Answers each fixed query by which metric it is, so tests don't depend on
 // query order or wording.
 function fakePrometheus(
   answers: Partial<Record<MetricKey, number | null | Error>>,
-): InstantQueryClient & { queries: string[] } {
+  ranges: Partial<Record<MetricKey, Point[] | Error>> = {},
+): PrometheusQueryClient & { queries: string[]; rangeQueries: { promql: string; start: number; end: number; step: number }[] } {
   const byQuery = new Map(
     Object.entries(buildQueries('payments', 'management')).map(([k, q]) => [q, k as MetricKey]),
   );
   const queries: string[] = [];
+  const rangeQueries: { promql: string; start: number; end: number; step: number }[] = [];
   return {
     queries,
+    rangeQueries,
+    async queryRange(promql: string, start: number, end: number, step: number) {
+      rangeQueries.push({ promql, start, end, step });
+      const key = byQuery.get(promql);
+      const answer = key === undefined ? undefined : ranges[key];
+      if (answer instanceof Error) throw answer;
+      return answer ?? [];
+    },
     async queryScalar(promql: string) {
       queries.push(promql);
       const key = byQuery.get(promql);
@@ -41,7 +51,7 @@ const HEALTHY: Partial<Record<MetricKey, number>> = {
 const logger = { warn: jest.fn(), info: jest.fn(), error: jest.fn(), debug: jest.fn() } as unknown as LoggerService;
 
 // Serves the router on an ephemeral port and makes one GET against it.
-async function get(prometheus: InstantQueryClient, path: string) {
+async function get(prometheus: PrometheusQueryClient, path: string) {
   const server = express()
     .use(createObservabilityRouter({ prometheus, logger }))
     .listen(0);
@@ -49,7 +59,11 @@ async function get(prometheus: InstantQueryClient, path: string) {
     const { port } = server.address() as AddressInfo;
     const res = await fetch(`http://127.0.0.1:${port}${path}`);
     const json = res.headers.get('content-type')?.includes('application/json');
-    return { status: res.status, body: json ? await res.json() : undefined };
+    return {
+      status: res.status,
+      headers: Object.fromEntries(res.headers),
+      body: json ? await res.json() : undefined,
+    };
   } finally {
     server.close();
   }
@@ -102,6 +116,18 @@ describe('readObservabilitySummary', () => {
       replicas: { available: 2, desired: 2 },
       restarts1h: 1,
       unavailable: [],
+      generatedAt: expect.any(String),
+      rateWindow: '2m',
+      series: {
+        stepSeconds: 30,
+        points: {
+          requestRate: [],
+          errorRatePercent: [],
+          p95LatencySeconds: [],
+          cpuUtilizationPercent: [],
+          memoryUtilizationPercent: [],
+        },
+      },
     });
   });
 
@@ -140,11 +166,48 @@ describe('readObservabilitySummary', () => {
   });
 });
 
+describe('trend series', () => {
+  const NOW = new Date('2026-09-29T12:00:10Z');
+
+  it('asks for the last 30 minutes at the scrape step, aligned to the step', async () => {
+    const prometheus = fakePrometheus(HEALTHY);
+    await readObservabilitySummary(prometheus, 'payments', 'management', NOW);
+    const end = Date.parse('2026-09-29T12:00:00Z') / 1000;
+    expect(prometheus.rangeQueries.map(q => [q.start, q.end, q.step])).toEqual(
+      Array(5).fill([end - 1800, end, 30]),
+    );
+    const queries = buildQueries('payments', 'management');
+    expect(prometheus.rangeQueries.map(q => q.promql)).toEqual([
+      queries.requestRate,
+      queries.errorRatePercent,
+      queries.p95LatencySeconds,
+      queries.cpuUtilizationPercent,
+      queries.memoryUtilizationPercent,
+    ]);
+  });
+
+  it('returns the points, and an empty trend when a range query fails', async () => {
+    const summary = await readObservabilitySummary(
+      fakePrometheus(HEALTHY, {
+        requestRate: [[1, 2], [31, 3]],
+        p95LatencySeconds: new Error('timeout'),
+      }),
+      'payments',
+      'management',
+      NOW,
+    );
+    expect(summary.series.points.requestRate).toEqual([[1, 2], [31, 3]]);
+    expect(summary.series.points.p95LatencySeconds).toEqual([]);
+    expect(summary.unavailable).toEqual([]);
+  });
+});
+
 describe('observability router', () => {
   it('returns the summary for a component/environment', async () => {
     const res = await get(fakePrometheus(HEALTHY), URL);
     expect(res.status).toBe(200);
     expect(res.body).toMatchObject({ component: 'payments', environment: 'management', requestRate: 12.4 });
+    expect(res.headers['cache-control']).toBe('no-store');
   });
 
   it('ignores any query string — PromQL cannot be supplied', async () => {
@@ -154,7 +217,11 @@ describe('observability router', () => {
       `${URL}?${new URLSearchParams({ query: 'up', metric: 'up', path: '/api/v1/admin/tsdb/delete_series' })}`,
     );
     expect(res.status).toBe(200);
-    expect(prometheus.queries).toEqual(Object.values(buildQueries('payments', 'management')));
+    const fixed = Object.values(buildQueries('payments', 'management'));
+    expect(prometheus.queries).toEqual(fixed);
+    for (const { promql } of prometheus.rangeQueries) {
+      expect(fixed).toContain(promql);
+    }
   });
 
   it('rejects an identity that is not a label value', async () => {
@@ -165,6 +232,7 @@ describe('observability router', () => {
     );
     expect(res.status).toBe(400);
     expect(prometheus.queries).toEqual([]);
+    expect(prometheus.rangeQueries).toEqual([]);
   });
 
   it('exposes no other route', async () => {
@@ -174,11 +242,10 @@ describe('observability router', () => {
   });
 
   it('answers 503 when Prometheus is unreachable', async () => {
-    const down: InstantQueryClient = {
-      queryScalar: async () => {
-        throw new Error('ECONNREFUSED');
-      },
+    const refuse = async () => {
+      throw new Error('ECONNREFUSED');
     };
+    const down: PrometheusQueryClient = { queryScalar: refuse, queryRange: refuse };
     const res = await get(down, URL);
     expect(res.status).toBe(503);
     expect(res.body).toEqual({ error: 'Metrics are unavailable right now' });
