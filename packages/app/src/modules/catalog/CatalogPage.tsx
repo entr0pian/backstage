@@ -40,7 +40,7 @@ import { scmIntegrationsApiRef } from '@backstage/integration-react';
 import type { Entity } from '@backstage/catalog-model';
 import { useDeployments } from '../deployments/useDeployments';
 import { EnvironmentHealthPill } from '../metrics/EnvironmentPulse';
-import { brand } from '../theme/themes';
+import { brand, displayFont } from '../theme/themes';
 
 const KIND_ICONS: Record<string, ReactElement> = {
   component: <ExtensionOutlinedIcon />,
@@ -81,7 +81,7 @@ const useStyles = makeStyles(theme => ({
   },
   bandTop: { position: 'relative', zIndex: 1, display: 'flex', justifyContent: 'space-between', gap: theme.spacing(2), flexWrap: 'wrap' },
   eyebrow: { fontSize: '0.75rem', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', opacity: 0.85 },
-  title: { fontSize: '2rem', fontWeight: 800, letterSpacing: '-0.03em', lineHeight: 1.15, margin: theme.spacing(0.5, 0) },
+  title: { fontFamily: displayFont, fontSize: '2.1rem', fontWeight: 800, letterSpacing: '-0.03em', lineHeight: 1.15, margin: theme.spacing(0.5, 0) },
   lead: { fontSize: '0.92rem', opacity: 0.9, maxWidth: 620 },
   kinds: { position: 'relative', zIndex: 1, display: 'flex', flexWrap: 'wrap', gap: theme.spacing(1), marginTop: theme.spacing(2.5) },
   kindChip: {
@@ -110,7 +110,7 @@ const useStyles = makeStyles(theme => ({
     alignSelf: 'flex-start',
   },
   toolbar: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: theme.spacing(2) },
-  count: { fontWeight: 700, fontSize: '1.05rem' },
+  count: { fontFamily: displayFont, fontWeight: 800, fontSize: '1.15rem' },
   toggle: {
     display: 'inline-flex',
     borderRadius: 10,
@@ -126,11 +126,12 @@ const useStyles = makeStyles(theme => ({
     display: 'flex',
     flexDirection: 'column',
     padding: theme.spacing(2.5),
-    borderRadius: 12,
+    borderRadius: 18,
     border: `1px solid ${theme.palette.divider}`,
     backgroundColor: theme.palette.background.paper,
     overflow: 'hidden',
-    transition: 'transform 150ms ease, box-shadow 150ms ease, border-color 150ms ease',
+    cursor: 'pointer',
+    transition: 'transform 250ms cubic-bezier(.34,1.56,.64,1), box-shadow 250ms ease, border-color 250ms ease',
     '&::before': {
       content: '""',
       position: 'absolute',
@@ -139,10 +140,11 @@ const useStyles = makeStyles(theme => ({
       backgroundImage: `linear-gradient(90deg, ${brand.indigo}, ${brand.cyanDeep})`,
     },
     '&:hover': {
-      transform: 'translateY(-2px)',
+      transform: 'translateY(-4px)',
       borderColor: alpha(theme.palette.primary.main, 0.45),
-      boxShadow: `0 10px 28px -14px ${alpha(theme.palette.primary.main, 0.5)}`,
+      boxShadow: `0 18px 40px -18px ${alpha(theme.palette.primary.main, 0.5)}`,
     },
+    '&:hover $cardIcon': { transform: 'rotate(-8deg) scale(1.08)' },
   },
   cardHead: { display: 'flex', alignItems: 'flex-start', gap: theme.spacing(1.5) },
   cardIcon: {
@@ -154,8 +156,19 @@ const useStyles = makeStyles(theme => ({
     borderRadius: 10,
     color: theme.palette.primary.main,
     backgroundColor: alpha(theme.palette.primary.main, 0.1),
+    transition: 'transform 250ms cubic-bezier(.34,1.56,.64,1)',
   },
-  cardName: { fontWeight: 700, fontSize: '1.05rem', letterSpacing: '-0.01em', lineHeight: 1.3 },
+  cardName: {
+    fontFamily: displayFont,
+    fontWeight: 800,
+    fontSize: '1.2rem',
+    letterSpacing: '-0.02em',
+    lineHeight: 1.3,
+    textDecoration: 'none !important',
+    // Stretched link: the name's ::after covers the whole card, so a click
+    // anywhere opens the service; other links inside sit above it.
+    '&::after': { content: '""', position: 'absolute', inset: 0, zIndex: 0 },
+  },
   cardKind: { fontSize: '0.72rem', color: theme.palette.text.secondary, textTransform: 'uppercase', letterSpacing: '0.06em' },
   cardText: {
     marginTop: theme.spacing(1.5),
@@ -169,7 +182,7 @@ const useStyles = makeStyles(theme => ({
   },
   chips: { display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: theme.spacing(1.5) },
   chip: { height: 22, fontSize: '0.72rem', fontWeight: 600 },
-  envs: { display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 'auto', paddingTop: theme.spacing(2) },
+  envs: { position: 'relative', zIndex: 1, display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 'auto', paddingTop: theme.spacing(2) },
   empty: {
     padding: theme.spacing(4),
     borderRadius: 12,

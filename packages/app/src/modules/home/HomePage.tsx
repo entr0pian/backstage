@@ -16,7 +16,7 @@ import { taskCreatePermission } from '@backstage/plugin-scaffolder-common/alpha'
 import type { Entity } from '@backstage/catalog-model';
 import { useDeployments } from '../deployments/useDeployments';
 import { EnvironmentPulseRow } from '../metrics/EnvironmentPulse';
-import { brand } from '../theme/themes';
+import { brand, displayFont } from '../theme/themes';
 
 const useStyles = makeStyles(theme => ({
   hero: {
@@ -57,6 +57,7 @@ const useStyles = makeStyles(theme => ({
     opacity: 0.85,
   },
   title: {
+    fontFamily: displayFont,
     fontSize: '2.4rem',
     fontWeight: 800,
     letterSpacing: '-0.03em',
@@ -80,11 +81,12 @@ const useStyles = makeStyles(theme => ({
     border: '1px solid rgba(255,255,255,0.22)',
     backdropFilter: 'blur(6px)',
   },
-  statValue: { fontSize: '1.6rem', fontWeight: 700, lineHeight: 1.1 },
+  statValue: { fontFamily: displayFont, fontSize: '1.6rem', fontWeight: 800, lineHeight: 1.1 },
   statLabel: { fontSize: '0.75rem', opacity: 0.85 },
   sectionTitle: {
-    fontSize: '1.05rem',
-    fontWeight: 700,
+    fontFamily: displayFont,
+    fontSize: '1.25rem',
+    fontWeight: 800,
     letterSpacing: '-0.01em',
     margin: theme.spacing(4, 0, 1.5),
   },
@@ -116,7 +118,7 @@ const useStyles = makeStyles(theme => ({
     color: '#fff',
     backgroundImage: `linear-gradient(135deg, ${brand.indigo}, ${brand.cyanDeep})`,
   },
-  actionTitle: { fontWeight: 700, fontSize: '0.98rem' },
+  actionTitle: { fontFamily: displayFont, fontWeight: 700, fontSize: '1rem' },
   actionText: { fontSize: '0.82rem', color: theme.palette.text.secondary, marginTop: 2 },
   ownerOnly: {
     display: 'inline-flex',
@@ -132,18 +134,37 @@ const useStyles = makeStyles(theme => ({
     '& svg': { fontSize: '0.8rem' },
   },
   service: {
+    position: 'relative',
     height: '100%',
     display: 'flex',
     flexDirection: 'column',
     padding: theme.spacing(2.5),
-    borderRadius: 12,
+    borderRadius: 18,
     border: `1px solid ${theme.palette.divider}`,
     backgroundColor: theme.palette.background.paper,
     borderTop: `3px solid ${brand.indigo}`,
+    cursor: 'pointer',
+    transition: 'transform 250ms cubic-bezier(.34,1.56,.64,1), box-shadow 250ms ease, border-color 250ms ease',
+    '&:hover': {
+      transform: 'translateY(-4px)',
+      borderColor: alpha(theme.palette.primary.main, 0.45),
+      boxShadow: `0 18px 40px -18px ${alpha(theme.palette.primary.main, 0.5)}`,
+    },
   },
-  serviceName: { fontSize: '1.15rem', fontWeight: 700, letterSpacing: '-0.01em' },
+  serviceName: {
+    fontFamily: displayFont,
+    fontSize: '1.3rem',
+    fontWeight: 800,
+    letterSpacing: '-0.02em',
+    textDecoration: 'none !important',
+    // Stretched link: the name's ::after covers the whole card, so a click
+    // anywhere opens the service; other links inside sit above it.
+    '&::after': { content: '""', position: 'absolute', inset: 0, zIndex: 0 },
+  },
   serviceMeta: { fontSize: '0.8rem', color: theme.palette.text.secondary },
   serviceLinks: {
+    position: 'relative',
+    zIndex: 1,
     display: 'flex',
     gap: theme.spacing(2),
     marginTop: 'auto',
