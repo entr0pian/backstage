@@ -8,6 +8,7 @@ import { ReleaseVersionReader } from './ReleaseVersionReader';
 import { DeployableVersionReader } from './DeployableVersionReader';
 import { createRouter } from './router';
 import { EnvironmentSummaryReader } from '../environmentSummary/EnvironmentSummaryReader';
+import { ClusterKubeConfigs } from '../platformClusters/ClusterKubeConfigs';
 import { DatabaseSummaryReader } from '../databaseSummary/DatabaseSummaryReader';
 import { ScaffoldVersionReader } from '../scaffoldVersions/ScaffoldVersionReader';
 import { PrometheusClient } from '../observabilitySummary/PrometheusClient';
@@ -73,7 +74,11 @@ export const releaseVersionsModule = createBackendPlugin({
         httpRouter.use(
           createRouter({
             reader,
-            environments: new EnvironmentSummaryReader(reader, logger),
+            environments: new EnvironmentSummaryReader(
+              reader,
+              ClusterKubeConfigs.fromConfig(config),
+              logger,
+            ),
             databases: new DatabaseSummaryReader(namespaces, reader, logger),
             versions: new DeployableVersionReader({
               catalog,

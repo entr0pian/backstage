@@ -51,6 +51,7 @@ data:
     app:
       baseUrl: ${BACKSTAGE_BASE_URL}
     {{- end }}
+    {{- $remoteClusters := include "backstage.remoteEnvironments" . }}
     {{- if or .Values.observability.prometheusUrl .Values.environments }}
     platform:
       {{- with .Values.observability.prometheusUrl }}
@@ -64,6 +65,11 @@ data:
       # Replaces the image's app-config.yaml list, so a new cluster is a
       # values change, not an image rebuild.
       environments: {{ . | toJson }}
+      {{- end }}
+      {{- if $remoteClusters }}
+      # Remote clusters' connection files (external-secret-clusters.yaml),
+      # read by the backend's platformClusters module.
+      clustersDir: {{ .Values.kubernetes.clustersDir | quote }}
       {{- end }}
     {{- end }}
     {{- if .Values.platformCatalog.enabled }}
@@ -96,7 +102,9 @@ data:
     {{- if .Values.kubernetes.enabled }}
     # @backstage/plugin-kubernetes-backend, read-only against the cluster
     # Backstage itself runs on — powers the Deployments tab's per-environment
-    # Logs (BACKSTAGE_PART8.md). No token configured: the serviceAccount auth
+    # Logs (BACKSTAGE_PART8.md). Remote clusters (dev, ...) aren't listed
+    # here: the backend's platformClusters module adds them from
+    # platform.clustersDir, so a missing one can't break startup. No token configured: the serviceAccount auth
     # provider then reads this pod's own projected ServiceAccount token on
     # every request, so there's no Secret to manage and rotation is free.
     # What that ServiceAccount may do is limited by clusterrole-kubernetes.yaml.

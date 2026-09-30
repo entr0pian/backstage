@@ -111,9 +111,17 @@ kubernetes:
   # BACKSTAGE_PART8.md. Who may use it is decided separately, by the
   # backend permission policy (owner only).
   enabled: false
-  # The name Backstage shows/uses for this cluster; any value works, it
-  # just has to be stable.
+  # The cluster Backstage runs on, named after its environment. Every other
+  # entry in `environments` is a remote cluster: its connection details come
+  # from taskapp/clusters/<env> (templates/external-secret-clusters.yaml),
+  # and Backstage authenticates with an EKS token from its Pod Identity role
+  # (taskapp-backstage), which that cluster's access entry + RBAC authorize.
   clusterName: management
+  clusterSecretStoreName: aws-secrets-manager
+  # Where the remote clusters' connection files are mounted.
+  clustersDir: /app/platform-clusters
+  # Region the EKS tokens are signed for.
+  awsRegion: eu-west-1
 
 resources: {}
 

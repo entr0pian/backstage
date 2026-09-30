@@ -56,6 +56,12 @@ spec:
               name: {{ .Release.Name }}-github-auth
               key: clientSecret
         {{- end }}
+        {{- if include "backstage.remoteEnvironments" . }}
+        # Region for the EKS tokens the Kubernetes plugin signs for remote
+        # clusters. Pod Identity supplies credentials, not a region.
+        - name: AWS_REGION
+          value: {{ .Values.kubernetes.awsRegion | quote }}
+        {{- end }}
         {{- if .Values.argocd.secretPath }}
         - name: ARGOCD_URL
           value: {{ .Values.argocd.baseUrl | quote }}
@@ -88,6 +94,11 @@ spec:
         - name: cluster-config
           mountPath: /app/app-config.cluster.yaml
           subPath: app-config.cluster.yaml
+        {{- if include "backstage.remoteEnvironments" . }}
+        - name: remote-clusters
+          mountPath: {{ .Values.kubernetes.clustersDir }}
+          readOnly: true
+        {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
@@ -104,3 +115,22 @@ spec:
       - name: cluster-config
         configMap:
           name: {{ .Release.Name }}-config
+      {{- with include "backstage.remoteEnvironments" . | splitList "\n" | compact }}
+      # One folder per remote cluster (external-secret-clusters.yaml).
+      # Optional: a cluster that doesn't exist yet is just an absent folder,
+      # and the kubelet fills it in once its Secret appears.
+      - name: remote-clusters
+        projected:
+          sources:
+          {{- range . }}
+          - secret:
+              name: {{ $.Release.Name }}-cluster-{{ . }}
+              optional: true
+              items:
+              {{- $env := . }}
+              {{- range list "clusterName" "server" "caData" }}
+              - key: {{ . }}
+                path: {{ $env }}/{{ . }}
+              {{- end }}
+          {{- end }}
+      {{- end }}

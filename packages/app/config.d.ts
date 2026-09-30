@@ -27,5 +27,11 @@ export interface Config {
      * @visibility frontend
      */
     environments?: string[];
+    /**
+     * Backend only: folder of registered workload clusters, one
+     * <env>/{clusterName,server,caData} per cluster, written by the chart's
+     * ExternalSecrets. Unset: only the local cluster is used.
+     */
+    clustersDir?: string;
   };
 }

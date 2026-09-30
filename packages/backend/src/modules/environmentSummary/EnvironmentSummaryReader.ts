@@ -3,11 +3,11 @@ import {
   CoreV1Api,
   CustomObjectsApi,
   DiscoveryV1Api,
-  KubeConfig,
 } from '@kubernetes/client-node';
 import type { LoggerService } from '@backstage/backend-plugin-api';
 import type { ReleaseVersionReader } from '../releaseVersions/ReleaseVersionReader';
 import type { ReleaseCustomResource } from '../releaseVersions/ReleaseVersionMapper';
+import type { ClusterKubeConfigs } from '../platformClusters/ClusterKubeConfigs';
 import type {
   EnvironmentObjects,
   K8sDeployment,
@@ -21,22 +21,20 @@ import type {
 
 // Reads everything one component's environment consists of, cluster-wide,
 // by the platform label contract (BACKSTAGE_PART8.md) — never by namespace
-// or naming convention. Read-only; uses this pod's own ServiceAccount (see
-// chart/templates/clusterrole.yaml for exactly what it may read). Never
-// lists or gets Secrets.
+// or naming convention. The Release is read here, on management; the
+// workload objects on the cluster the environment runs on (ClusterKubeConfigs:
+// this pod's own ServiceAccount locally, see chart/templates/clusterrole.yaml,
+// or an EKS token on a workload cluster, see helm-charts platform
+// backstage-reader.yaml). Read-only; never lists or gets Secrets.
 //
 // Each read degrades independently: a failed list is logged and contributes
 // nothing, so one missing permission or CRD can't blank the whole view.
 export class EnvironmentSummaryReader {
-  private readonly kubeConfig: KubeConfig;
-
   constructor(
     private readonly releases: ReleaseVersionReader,
+    private readonly clusters: ClusterKubeConfigs,
     private readonly logger: LoggerService,
-  ) {
-    this.kubeConfig = new KubeConfig();
-    this.kubeConfig.loadFromDefault();
-  }
+  ) {}
 
   private async attempt<T>(what: string, fallback: T, fn: () => Promise<T>): Promise<T> {
     try {
@@ -50,10 +48,11 @@ export class EnvironmentSummaryReader {
   }
 
   async read(component: string, environment: string): Promise<EnvironmentObjects> {
-    const core = this.kubeConfig.makeApiClient(CoreV1Api);
-    const apps = this.kubeConfig.makeApiClient(AppsV1Api);
-    const discovery = this.kubeConfig.makeApiClient(DiscoveryV1Api);
-    const custom = this.kubeConfig.makeApiClient(CustomObjectsApi);
+    const kubeConfig = await this.clusters.forEnvironment(environment);
+    const core = kubeConfig.makeApiClient(CoreV1Api);
+    const apps = kubeConfig.makeApiClient(AppsV1Api);
+    const discovery = kubeConfig.makeApiClient(DiscoveryV1Api);
+    const custom = kubeConfig.makeApiClient(CustomObjectsApi);
 
     const labelSelector = `platform.taskapp.io/component=${component},platform.taskapp.io/environment=${environment}`;
 

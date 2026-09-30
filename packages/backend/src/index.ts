@@ -85,6 +85,9 @@ backend.add(import('@backstage/plugin-search-backend-module-techdocs'));
 
 // kubernetes plugin
 backend.add(import('@backstage/plugin-kubernetes-backend'));
+// Registered workload clusters (dev, ...) alongside the local one, from
+// files the chart's ExternalSecrets write. See modules/platformClusters/.
+backend.add(import('./modules/platformClusters/module'));
 
 // user settings plugin
 backend.add(import('@backstage/plugin-user-settings-backend'));
