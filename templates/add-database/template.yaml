@@ -22,7 +22,7 @@ spec:
           title: Component
           type: string
           description: The service this database belongs to.
-          ui:disabled: true
+          ui:field: PlatformComponentPicker
         environment:
           title: Environment
           type: string

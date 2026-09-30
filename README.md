@@ -182,8 +182,11 @@ never creates a `Release` or talks to Kubernetes/Crossplane directly.
 - **How `componentName` gets forwarded without manual entry**: the link is
   `/create/templates/default/add-database?formData={"componentName":"<name>"}`.
   `@backstage/plugin-scaffolder-react`'s `useFormDataFromQuery` hook reads
-  that `formData` query param as the form's initial state; the template
-  marks the field `ui:disabled: true` so it's shown but not editable.
+  that `formData` query param as the form's initial state. The field is
+  `ui:field: PlatformComponentPicker` (also used by Create deployment): it
+  stays locked when the form opens with a component, and is a dropdown of
+  the catalog's services when the template is started from Home or the
+  template list.
 - **Template location**: `templates/add-database/template.yaml`
   (+ `skeleton/database.yaml`, renamed to `<component>-db.yaml` by an
   `fs:rename` step, same reason as Milestone 1's rename step), registered

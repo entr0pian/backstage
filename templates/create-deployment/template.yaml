@@ -21,7 +21,7 @@ spec:
           title: Component
           type: string
           description: The service to deploy.
-          ui:disabled: true
+          ui:field: PlatformComponentPicker
         environment:
           title: Environment
           type: string
