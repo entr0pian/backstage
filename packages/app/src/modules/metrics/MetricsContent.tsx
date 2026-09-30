@@ -8,10 +8,9 @@ import OpenInNewIcon from '@material-ui/icons/OpenInNew';
 import ErrorIcon from '@material-ui/icons/Error';
 import WarningIcon from '@material-ui/icons/Warning';
 import HelpOutlineIcon from '@material-ui/icons/HelpOutline';
+import ShowChartIcon from '@material-ui/icons/ShowChart';
 import { alpha, makeStyles, useTheme, type Theme } from '@material-ui/core/styles';
 import {
-  EmptyState,
-  InfoCard,
   Progress,
   ResponseErrorPanel,
   StatusError,
@@ -24,7 +23,8 @@ import { useDeployments } from '../deployments/useDeployments';
 import { serviceOverviewUrl, useGrafanaUiUrl } from './grafana';
 import { REFRESH_INTERVAL_MS, useObservabilitySummary } from './useObservabilitySummary';
 import { Sparkline } from './Sparkline';
-import { timeAgo } from '../platformUi';
+import { EnvironmentCard, PlatformEmptyState, timeAgo } from '../platformUi';
+import { displayFont } from '../theme/themes';
 import {
   formatCount,
   formatLatency,
@@ -71,7 +71,11 @@ const useStyles = makeStyles(theme => ({
     borderRadius: theme.shape.borderRadius * 2,
     border: `1px solid ${theme.palette.divider}`,
     backgroundColor: theme.palette.background.default,
-    transition: 'border-color 200ms ease, background-color 200ms ease',
+    transition: 'transform 200ms cubic-bezier(.34,1.56,.64,1), border-color 200ms ease, background-color 200ms ease',
+    '&:hover': {
+      transform: 'translateY(-2px)',
+      backgroundColor: theme.palette.background.paper,
+    },
   },
   labelRow: {
     display: 'flex',
@@ -81,12 +85,15 @@ const useStyles = makeStyles(theme => ({
   },
   label: {
     color: theme.palette.text.secondary,
-    fontSize: '0.78rem',
-    fontWeight: 500,
+    fontSize: '0.7rem',
+    fontWeight: 700,
+    letterSpacing: '0.08em',
+    textTransform: 'uppercase',
     whiteSpace: 'nowrap',
   },
   stateIcon: { fontSize: '1.1rem' },
   value: {
+    fontFamily: displayFont,
     fontSize: '1.6rem',
     fontWeight: 600,
     lineHeight: 1.25,
@@ -542,8 +549,8 @@ export const MetricsCard = ({
   }
 
   return (
-    <InfoCard
-      title={environment}
+    <EnvironmentCard
+      environment={environment}
       action={
         summary && health ? (
           <Box pt={2} pr={2}>
@@ -568,7 +575,7 @@ export const MetricsCard = ({
           </Button>
         )}
       </div>
-    </InfoCard>
+    </EnvironmentCard>
   );
 };
 
@@ -590,9 +597,9 @@ export const MetricsContent = () => {
   }
   if (deployments.deployments.length === 0) {
     return (
-      <EmptyState
-        missing="data"
-        title="No deployments found for this component"
+      <PlatformEmptyState
+        icon={<ShowChartIcon />}
+        title="No metrics yet"
         description="Metrics appear here per environment once the component is deployed."
       />
     );

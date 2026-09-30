@@ -4,6 +4,7 @@
 // or the platform's own modules; this only restyles them.
 import {
   createUnifiedTheme,
+  defaultTypography,
   genPageTheme,
   pageTheme as defaultPageThemes,
   palettes,
@@ -21,6 +22,24 @@ export const brand = {
 
 export const fontFamily =
   'Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
+
+// Headings, card titles and tabs: rounder and friendlier than Inter, which
+// stays for body text and data.
+export const displayFont = `"Plus Jakarta Sans", ${fontFamily}`;
+
+const typography = {
+  ...defaultTypography,
+  fontFamily,
+  h1: { ...defaultTypography.h1, fontFamily: displayFont, fontWeight: 800 },
+  h2: { ...defaultTypography.h2, fontFamily: displayFont, fontWeight: 800 },
+  h3: { ...defaultTypography.h3, fontFamily: displayFont, fontWeight: 700 },
+  h4: { ...defaultTypography.h4, fontFamily: displayFont, fontWeight: 700 },
+  h5: { ...defaultTypography.h5, fontFamily: displayFont, fontWeight: 700 },
+  h6: { ...defaultTypography.h6, fontFamily: displayFont, fontWeight: 700 },
+};
+
+// Springy easing for hovers: a small overshoot reads as playful.
+const spring = 'cubic-bezier(.34,1.56,.64,1)';
 
 // One brand gradient for every page kind (home, service, website, …) so
 // entity pages share the logo's colours instead of Backstage's per-kind
@@ -54,8 +73,38 @@ const components = (mode: Mode) => {
   const cardShadow = dark
     ? '0 1px 2px rgba(0, 0, 0, 0.4)'
     : '0 1px 2px rgba(15, 23, 42, 0.04), 0 4px 16px -6px rgba(15, 23, 42, 0.08)';
+  const cardShadowHover = dark
+    ? '0 18px 40px -18px rgba(99, 102, 241, 0.55), 0 0 0 1px rgba(129, 140, 248, 0.35)'
+    : '0 18px 40px -18px rgba(79, 70, 229, 0.35), 0 0 0 1px rgba(99, 102, 241, 0.22)';
+  // Cards aren't flat white: a faint brand wash fades in from the top.
+  const cardSurface = dark
+    ? 'linear-gradient(180deg, rgba(99, 102, 241, 0.08) 0%, rgba(18, 24, 41, 0) 140px)'
+    : 'linear-gradient(180deg, rgba(99, 102, 241, 0.05) 0%, rgba(255, 255, 255, 0) 140px)';
 
   return {
+    MuiCssBaseline: {
+      styleOverrides: {
+        '@global': {
+          // Soft brand glows behind the page, so the canvas isn't flat grey.
+          body: {
+            backgroundImage: dark
+              ? 'radial-gradient(900px 500px at 100% -10%, rgba(34, 211, 238, 0.08), transparent 60%), radial-gradient(800px 500px at 20% 0%, rgba(99, 102, 241, 0.12), transparent 60%)'
+              : 'radial-gradient(900px 500px at 100% -10%, rgba(34, 211, 238, 0.10), transparent 60%), radial-gradient(800px 500px at 20% 0%, rgba(99, 102, 241, 0.10), transparent 60%)',
+            backgroundAttachment: 'fixed',
+          },
+          '@keyframes platformFadeUp': {
+            from: { opacity: 0, transform: 'translateY(8px)' },
+            to: { opacity: 1, transform: 'none' },
+          },
+          '@media (prefers-reduced-motion: reduce)': {
+            '*, *::before, *::after': {
+              animationDuration: '0.01ms !important',
+              transitionDuration: '0.01ms !important',
+            },
+          },
+        },
+      },
+    },
     BackstageHeader: {
       styleOverrides: {
         header: {
@@ -98,14 +147,26 @@ const components = (mode: Mode) => {
         elevation2: { boxShadow: cardShadow, border: `1px solid ${border}` },
       },
     },
+    // Cards fade up as a page loads, then lift and pick up a brand glow on
+    // hover.
     MuiCard: {
       styleOverrides: {
-        root: { borderRadius: 12 },
+        root: {
+          borderRadius: 18,
+          backgroundImage: cardSurface,
+          animation: 'platformFadeUp 380ms ease both',
+          transition: `transform 250ms ${spring}, box-shadow 250ms ease, border-color 250ms ease`,
+          '&:hover': {
+            transform: 'translateY(-3px)',
+            boxShadow: cardShadowHover,
+            borderColor: 'transparent',
+          },
+        },
       },
     },
     MuiCardHeader: {
       styleOverrides: {
-        title: { fontWeight: 700, letterSpacing: '-0.01em' },
+        title: { fontFamily: displayFont, fontWeight: 800, letterSpacing: '-0.02em' },
       },
     },
     MuiDialog: {
@@ -123,6 +184,7 @@ const components = (mode: Mode) => {
         },
         contained: {
           boxShadow: 'none',
+          transition: `transform 200ms ${spring}, box-shadow 200ms ease`,
           '&:hover': { boxShadow: 'none' },
         },
         containedPrimary: {
@@ -130,14 +192,24 @@ const components = (mode: Mode) => {
           color: '#ffffff',
           '&:hover': {
             backgroundImage: `linear-gradient(135deg, ${brand.indigoDeep}, #4338ca)`,
+            transform: 'translateY(-1px)',
+            boxShadow: `0 10px 20px -10px ${brand.indigo}`,
           },
         },
-        outlined: { borderColor: border },
+        outlined: {
+          borderColor: border,
+          transition: `transform 200ms ${spring}, background-color 200ms ease, border-color 200ms ease`,
+          '&:hover': {
+            transform: 'translateY(-1px)',
+            borderColor: dark ? brand.indigoLight : brand.indigo,
+            backgroundColor: dark ? 'rgba(129, 140, 248, 0.12)' : 'rgba(99, 102, 241, 0.06)',
+          },
+        },
       },
     },
     MuiChip: {
       styleOverrides: {
-        root: { borderRadius: 8, fontWeight: 500 },
+        root: { borderRadius: 999, fontWeight: 500 },
       },
     },
     MuiTab: {
@@ -241,6 +313,7 @@ export const lightTheme = createUnifiedTheme({
     tabbar: { indicator: brand.indigo },
   },
   fontFamily,
+  typography,
   defaultPageTheme: 'home',
   pageTheme: pageThemes,
   components: components('light'),
@@ -260,6 +333,7 @@ export const darkTheme = createUnifiedTheme({
     tabbar: { indicator: brand.cyan },
   },
   fontFamily,
+  typography,
   defaultPageTheme: 'home',
   pageTheme: pageThemes,
   components: components('dark'),

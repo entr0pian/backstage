@@ -6,12 +6,11 @@ import Tooltip from '@material-ui/core/Tooltip';
 import Typography from '@material-ui/core/Typography';
 import OpenInNewIcon from '@material-ui/icons/OpenInNew';
 import { makeStyles, useTheme } from '@material-ui/core/styles';
-import {
-  EmptyState,
-  InfoCard,
-  Progress,
-  ResponseErrorPanel,
-} from '@backstage/core-components';
+import { displayFont } from '../theme/themes';
+import CloudUploadIcon from '@material-ui/icons/CloudUpload';
+import RocketIcon from '@material-ui/icons/FlightTakeoff';
+import { LinkButton, Progress, ResponseErrorPanel } from '@backstage/core-components';
+import { taskCreatePermission } from '@backstage/plugin-scaffolder-common/alpha';
 import { useEntity } from '@backstage/plugin-catalog-react';
 import { kubernetesProxyPermission } from '@backstage/plugin-kubernetes-common';
 import { usePermission } from '@backstage/plugin-permission-react';
@@ -20,7 +19,15 @@ import { argoApplicationUrl, useArgocdUiUrl } from '../platformUi/argocd';
 import { useDeployments } from './useDeployments';
 import { LogsDialog } from './LogsDialog';
 import { DetailsDrawer } from './DetailsDrawer';
-import { HealthStatus, SyncStatus, shortVersion, timeAgo } from '../platformUi';
+import {
+  EnvironmentCard as PlatformEnvironmentCard,
+  HealthStatus,
+  PlatformEmptyState,
+  SyncStatus,
+  shortVersion,
+  timeAgo,
+} from '../platformUi';
+import { createDeploymentHref } from '../platformActions/createDeploymentHref';
 
 function formatTimestamp(value: string | null): string {
   if (!value) {
@@ -37,14 +44,27 @@ const useStyles = makeStyles(theme => ({
   tile: {
     height: '100%',
     padding: theme.spacing(2, 2, 1.5),
-    borderRadius: theme.shape.borderRadius * 2,
+    borderRadius: 14,
     border: `1px solid ${theme.palette.divider}`,
     backgroundColor: theme.palette.background.default,
+    transition: 'transform 200ms cubic-bezier(.34,1.56,.64,1), border-color 200ms ease, background-color 200ms ease',
+    '&:hover': {
+      transform: 'translateY(-2px)',
+      borderColor: theme.palette.primary.main,
+      backgroundColor: theme.palette.background.paper,
+    },
   },
-  label: { color: theme.palette.text.secondary, fontSize: '0.78rem', fontWeight: 500 },
+  label: {
+    color: theme.palette.text.secondary,
+    fontSize: '0.7rem',
+    fontWeight: 700,
+    letterSpacing: '0.08em',
+    textTransform: 'uppercase',
+  },
   value: {
-    fontSize: '1.25rem',
-    fontWeight: 600,
+    fontFamily: displayFont,
+    fontSize: '1.3rem',
+    fontWeight: 700,
     lineHeight: 1.4,
     marginTop: theme.spacing(0.5),
     minHeight: 34,
@@ -131,8 +151,8 @@ const EnvironmentCard = ({
   const current = deployment.revision;
 
   return (
-    <InfoCard
-      title={deployment.environment}
+    <PlatformEnvironmentCard
+      environment={deployment.environment}
       action={
         <Box pt={2} pr={2}>
           <HealthStatus status={deployment.healthStatus} pending={pending} />
@@ -255,7 +275,7 @@ const EnvironmentCard = ({
           </Button>
         )}
       </div>
-    </InfoCard>
+    </PlatformEnvironmentCard>
   );
 };
 
@@ -276,6 +296,8 @@ export const DeploymentsContent = () => {
   const { allowed: logsAllowed } = usePermission({
     permission: kubernetesProxyPermission,
   });
+  // Deploying runs a scaffolder template, which guests can't.
+  const { allowed: canDeploy } = usePermission({ permission: taskCreatePermission });
 
   if (state.status === 'loading') {
     return <Progress />;
@@ -285,10 +307,22 @@ export const DeploymentsContent = () => {
   }
   if (state.deployments.length === 0) {
     return (
-      <EmptyState
-        missing="data"
-        title="No deployments found for this component"
-        description="No Release CRs reference this component yet."
+      <PlatformEmptyState
+        icon={<RocketIcon />}
+        title="Not deployed yet"
+        description="No Release references this component. Pick a version and an environment to ship it."
+        action={
+          canDeploy && (
+            <LinkButton
+              to={createDeploymentHref(entity.metadata.name)}
+              color="primary"
+              variant="contained"
+              startIcon={<CloudUploadIcon />}
+            >
+              Create deployment
+            </LinkButton>
+          )
+        }
       />
     );
   }

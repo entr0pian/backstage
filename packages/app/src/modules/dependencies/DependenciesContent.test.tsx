@@ -63,26 +63,28 @@ describe('DependenciesContent', () => {
     });
   });
 
-  it('gives each environment its own card, empty ones included', async () => {
+  it('gives each environment with dependencies its own card', async () => {
     await render('ALLOW');
-    expect(await screen.findByText('1 dependency in dev')).toBeInTheDocument();
-    expect(screen.getByText('No dependencies in management')).toBeInTheDocument();
-    expect(screen.getByText('This service uses no platform infrastructure in management.')).toBeInTheDocument();
+    expect(await screen.findByText('1 dependency')).toBeInTheDocument();
+    expect(screen.getByText('dev')).toBeInTheDocument();
     expect(screen.getAllByText('payments-db')).toHaveLength(1);
   });
 
-  it('offers Add database per environment to the owner only', async () => {
+  it('offers the owner to add a database in the card and in each empty environment', async () => {
     await render('ALLOW');
-    const links = (await screen.findAllByText('Add database')).map(label => label.closest('a')!);
-    expect(links.map(l => decodeURIComponent(l.getAttribute('href') ?? ''))).toEqual([
-      '/create/templates/default/add-database?formData={"componentName":"payments","environment":"management"}',
+    const hrefs = (await screen.findAllByText(/add (a )?database/i)).map(label =>
+      decodeURIComponent(label.closest('a')?.getAttribute('href') ?? ''),
+    );
+    expect(hrefs).toEqual([
       '/create/templates/default/add-database?formData={"componentName":"payments","environment":"dev"}',
+      '/create/templates/default/add-database?formData={"componentName":"payments","environment":"management"}',
     ]);
   });
 
-  it('hides Add database from guests', async () => {
+  it('shows guests only what exists', async () => {
     await render('DENY');
-    await screen.findByText('1 dependency in dev');
-    expect(screen.queryByText('Add database')).not.toBeInTheDocument();
+    await screen.findByText('1 dependency');
+    expect(screen.queryByText(/add (a )?database/i)).not.toBeInTheDocument();
+    expect(screen.queryByText('management')).not.toBeInTheDocument();
   });
 });

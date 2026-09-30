@@ -11,12 +11,18 @@ import {
   StatusPending,
   StatusWarning,
 } from '@backstage/core-components';
+import { accentGradient, environmentAccent } from './environmentAccent';
 
 const useStyles = makeStyles(theme => ({
   envChip: {
-    fontWeight: 600,
+    fontWeight: 700,
     letterSpacing: 0.3,
     height: 22,
+    color: '#fff',
+    border: 0,
+    borderRadius: 999,
+    transition: 'transform 200ms cubic-bezier(.34,1.56,.64,1)',
+    '&:hover': { transform: 'scale(1.06)' },
   },
   version: {
     fontFamily: 'monospace',
@@ -33,6 +39,8 @@ const useStyles = makeStyles(theme => ({
 // are shown as-is.
 export const shortVersion = (v: string) => (/^[0-9a-f]{40}$/.test(v) ? v.slice(0, 7) : v);
 
+// Filled with the environment's own colour (environmentAccent), the same
+// one its cards on the per-environment tabs carry.
 export const EnvironmentChip = ({ environment }: { environment: string }) => {
   const classes = useStyles();
   return (
@@ -40,8 +48,7 @@ export const EnvironmentChip = ({ environment }: { environment: string }) => {
       className={classes.envChip}
       label={environment}
       size="small"
-      variant="outlined"
-      color={environment === 'prod' || environment === 'production' ? 'secondary' : 'primary'}
+      style={{ background: accentGradient(environmentAccent(environment)) }}
     />
   );
 };
@@ -95,3 +102,7 @@ export const HealthStatus = ({ status, pending }: { status: string; pending?: bo
       return <StatusWarning>{status}</StatusWarning>;
   }
 };
+
+export { EnvironmentCard } from './EnvironmentCard';
+export { PlatformEmptyState } from './PlatformEmptyState';
+export { environmentAccent, accentGradient } from './environmentAccent';

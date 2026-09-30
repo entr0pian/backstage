@@ -18,7 +18,7 @@ import { EnvironmentHealthPill } from '../metrics/EnvironmentPulse';
 import { useGrafanaUiUrl, serviceOverviewUrl } from '../metrics/grafana';
 import { argoApplicationUrl, argoApplicationsUrl, useArgocdUiUrl } from '../platformUi/argocd';
 import { shortVersion } from '../platformUi';
-import { brand } from '../theme/themes';
+import { brand, displayFont } from '../theme/themes';
 
 const useStyles = makeStyles(theme => ({
   // Inset and rounded like the cards below it, so the page reads as one
@@ -46,7 +46,7 @@ const useStyles = makeStyles(theme => ({
   },
   top: { position: 'relative', zIndex: 1, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: theme.spacing(2) },
   eyebrow: { fontSize: '0.75rem', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', opacity: 0.85 },
-  title: { fontSize: '2rem', fontWeight: 800, letterSpacing: '-0.03em', lineHeight: 1.15, margin: theme.spacing(0.5, 0) },
+  title: { fontFamily: displayFont, fontSize: '2.1rem', fontWeight: 800, letterSpacing: '-0.03em', lineHeight: 1.15, margin: theme.spacing(0.5, 0) },
   meta: { fontSize: '0.88rem', opacity: 0.9 },
   row: {
     position: 'relative',
@@ -75,12 +75,18 @@ const useStyles = makeStyles(theme => ({
     '& svg': { fontSize: '1rem' },
   },
   iconOnBrand: { color: '#fff' },
+  // Pill tabs: a soft tint on hover, the active one filled with the brand
+  // gradient.
   tabs: {
     display: 'flex',
-    gap: theme.spacing(0.5),
-    padding: theme.spacing(0, 1),
-    marginTop: theme.spacing(1),
-    borderBottom: `1px solid ${theme.palette.divider}`,
+    gap: theme.spacing(0.75),
+    padding: theme.spacing(0.75),
+    margin: theme.spacing(2, 0, 0.5),
+    width: 'fit-content',
+    maxWidth: '100%',
+    borderRadius: 999,
+    backgroundColor: theme.palette.type === 'dark' ? 'rgba(148,163,184,0.08)' : 'rgba(99,102,241,0.06)',
+    border: `1px solid ${theme.palette.type === 'dark' ? 'rgba(148,163,184,0.14)' : 'rgba(99,102,241,0.12)'}`,
     overflowX: 'auto',
     overflowY: 'hidden',
   },
@@ -88,23 +94,29 @@ const useStyles = makeStyles(theme => ({
     display: 'inline-flex',
     alignItems: 'center',
     gap: 4,
-    padding: theme.spacing(1.5, 1.5),
+    padding: theme.spacing(1, 2),
+    borderRadius: 999,
+    fontFamily: displayFont,
     fontSize: '0.9rem',
-    fontWeight: 600,
+    fontWeight: 700,
     whiteSpace: 'nowrap',
     color: theme.palette.text.secondary,
     textDecoration: 'none',
-    borderBottom: '2px solid transparent',
-    marginBottom: -1,
     background: 'none',
     border: 0,
     cursor: 'pointer',
-    font: 'inherit',
-    '&:hover': { color: theme.palette.text.primary },
+    transition: 'color 150ms ease, background-color 150ms ease, transform 200ms cubic-bezier(.34,1.56,.64,1)',
+    '&:hover': {
+      color: theme.palette.text.primary,
+      backgroundColor: theme.palette.type === 'dark' ? 'rgba(129,140,248,0.14)' : 'rgba(99,102,241,0.1)',
+      transform: 'translateY(-1px)',
+    },
   },
   tabActive: {
-    color: theme.palette.text.primary,
-    borderBottom: `2px solid ${brand.indigo}`,
+    color: '#fff !important',
+    backgroundImage: `linear-gradient(120deg, ${brand.indigoDeep}, ${brand.indigo} 55%, ${brand.cyanDeep})`,
+    boxShadow: `0 8px 18px -8px ${brand.indigo}`,
+    '&:hover': { backgroundColor: 'transparent' },
   },
 }));
 

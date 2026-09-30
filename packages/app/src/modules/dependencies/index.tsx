@@ -3,10 +3,17 @@ import {
   EntityCardBlueprint,
   EntityContentBlueprint,
 } from '@backstage/plugin-catalog-react/alpha';
-import type { Entity } from '@backstage/catalog-model';
+import { RELATION_DEPENDS_ON, type Entity } from '@backstage/catalog-model';
 
 const isService = (entity: Entity) =>
   entity.kind === 'Component' && entity.spec?.type === 'service';
+
+// The tab only appears once the service depends on at least one Resource
+// (e.g. a platform Database) — read from the entity's own relations, so
+// deciding costs no request.
+export const hasDependencies = (entity: Entity) =>
+  isService(entity) &&
+  (entity.relations ?? []).some(r => r.type === RELATION_DEPENDS_ON && r.targetRef.startsWith('resource:'));
 
 // Overview summary: one row per environment with dependencies.
 const dependenciesCard = EntityCardBlueprint.make({
@@ -28,7 +35,7 @@ const dependenciesContent = EntityContentBlueprint.make({
     path: 'dependencies',
     title: 'Dependencies',
     group: 'dependencies',
-    filter: isService,
+    filter: hasDependencies,
     loader: () => import('./DependenciesContent').then(m => <m.DependenciesContent />),
   },
 });

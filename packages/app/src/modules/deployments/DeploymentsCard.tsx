@@ -5,8 +5,8 @@ import ListItem from '@material-ui/core/ListItem';
 import Typography from '@material-ui/core/Typography';
 import { makeStyles } from '@material-ui/core/styles';
 import ChevronRightIcon from '@material-ui/icons/ChevronRight';
+import RocketIcon from '@material-ui/icons/FlightTakeoff';
 import {
-  EmptyState,
   InfoCard,
   Progress,
   ResponseErrorPanel,
@@ -17,6 +17,7 @@ import { useDeployments } from './useDeployments';
 import {
   EnvironmentChip,
   HealthStatus,
+  PlatformEmptyState,
   SyncStatus,
   VersionTag,
   timeAgo,
@@ -28,8 +29,11 @@ const useStyles = makeStyles(theme => ({
     gridTemplateColumns: 'minmax(110px, 1fr) minmax(90px, 1fr) minmax(90px, 1fr) minmax(100px, 1fr) 24px',
     alignItems: 'center',
     gap: theme.spacing(2),
-    borderRadius: theme.shape.borderRadius,
-    padding: theme.spacing(1.5, 1),
+    borderRadius: 12,
+    padding: theme.spacing(1.5, 1.5),
+    transition: 'background-color 150ms ease, transform 200ms cubic-bezier(.34,1.56,.64,1)',
+    '&:hover': { transform: 'translateX(4px)' },
+    '&:hover $chevron': { transform: 'translateX(3px)', color: theme.palette.primary.main },
   },
   header: {
     display: 'grid',
@@ -40,6 +44,7 @@ const useStyles = makeStyles(theme => ({
   },
   chevron: {
     color: theme.palette.text.secondary,
+    transition: 'transform 200ms ease, color 200ms ease',
   },
 }));
 
@@ -91,10 +96,10 @@ export const DeploymentsCard = () => {
       {state.status === 'loading' && <Progress />}
       {state.status === 'error' && <ResponseErrorPanel error={state.error} />}
       {state.status === 'done' && state.deployments.length === 0 && (
-        <EmptyState
-          missing="data"
+        <PlatformEmptyState
+          icon={<RocketIcon />}
           title="Not deployed anywhere yet"
-          description="No Release CRs reference this component yet."
+          description="No Release references this component yet. Use Create deployment to ship it."
         />
       )}
       {hasRows && (
