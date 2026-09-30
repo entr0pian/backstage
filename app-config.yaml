@@ -256,8 +256,9 @@ platform:
   # application-repositories values/kube-prometheus-stack/management.yaml).
   grafanaUiUrl: https://grafana.gerodimos.dev
   # Environments the Create deployment template offers (its Environment
-  # picker). Only management runs today; add dev/prod here when those
-  # clusters exist again.
+  # picker). Default for local runs only: the deployed instance takes its
+  # list from the chart's `environments` value (application-repositories
+  # values/backstage/management.yaml), so adding a cluster needs no rebuild.
   environments:
     - management
 

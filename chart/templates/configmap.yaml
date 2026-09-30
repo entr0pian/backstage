@@ -51,12 +51,20 @@ data:
     app:
       baseUrl: ${BACKSTAGE_BASE_URL}
     {{- end }}
-    {{- with .Values.observability.prometheusUrl }}
-    # Metrics tab's fixed-query backend route (OBSERVABILLITY_PART4.md
-    # Part 3). Cluster-internal; Prometheus is never exposed publicly.
+    {{- if or .Values.observability.prometheusUrl .Values.environments }}
     platform:
+      {{- with .Values.observability.prometheusUrl }}
+      # Metrics tab's fixed-query backend route (OBSERVABILLITY_PART4.md
+      # Part 3). Cluster-internal; Prometheus is never exposed publicly.
       observability:
         prometheusUrl: {{ . | quote }}
+      {{- end }}
+      {{- with .Values.environments }}
+      # Create deployment's Environment picker (and the Home page count).
+      # Replaces the image's app-config.yaml list, so a new cluster is a
+      # values change, not an image rebuild.
+      environments: {{ . | toJson }}
+      {{- end }}
     {{- end }}
     {{- if .Values.platformCatalog.enabled }}
     platformCatalog:

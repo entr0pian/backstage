@@ -370,9 +370,11 @@ environment files, Argo CD syncs them
   conflicts. That's the intended signal that it's out of date.
 - **Custom form fields**: `packages/app/src/modules/createDeployment/`, a
   scaffolder frontend module (`FormFieldBlueprint`):
-  - `PlatformEnvironmentPicker`: the `platform.environments` list in
-    `app-config.yaml`. It's only `management` today; add a cluster there when
-    it exists.
+  - `PlatformEnvironmentPicker`: the `platform.environments` list. The
+    deployed instance gets it from the chart's `environments` value (set in
+    `application-repositories` `values/backstage/management.yaml`), so a new
+    cluster is a values change, not an image rebuild. `app-config.yaml`
+    keeps a `[management]` default for local runs.
   - `PlatformVersionPicker`: commits on the component repo's `main` whose
     `ci.yaml` push run succeeded. CI only pushes an image, tagged with the
     full commit SHA, from those runs. Each entry shows the short SHA, commit
