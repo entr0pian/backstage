@@ -4,10 +4,9 @@ metadata:
   name: add-database
   title: Add Database
   description: >-
-    Add a database to an existing platform component by opening a pull
-    request against application-repositories with a Database CR. Backstage
-    does not create any Kubernetes resources directly — the existing
-    Argo CD / Crossplane flow picks up the Database once this PR is merged.
+    Give a service its own Postgres in one environment. Opens a pull request;
+    once it's merged, Crossplane provisions the database and the service can
+    bind to it.
 spec:
   owner: user:guest
   type: resource
@@ -22,35 +21,22 @@ spec:
         componentName:
           title: Component
           type: string
-          description: >-
-            The platform component this database belongs to. Derived from
-            the Catalog entity you launched this from — not editable here.
+          description: The service this database belongs to.
           ui:disabled: true
         environment:
           title: Environment
           type: string
-          description: >-
-            Environment this database is provisioned for. "management" is
-            included alongside dev/prod for single-cluster setups (e.g. the
-            EKS management cluster standing in for dev while only one real
-            cluster exists) — platform/environments/<env> just picks a
-            namespace on the management cluster, never a destination
-            cluster, so this is safe regardless of which value is chosen.
-          enum:
-            - dev
-            - prod
-            - management
+          description: Where the database runs.
+          ui:field: PlatformEnvironmentPicker
         dbName:
           title: Database name
           type: string
-          description: >-
-            Name of the database/schema to create (spec.dbName on the
-            Database CR).
+          description: Lowercase letters, digits and underscores, e.g. orders.
           pattern: '^[a-z][a-z0-9_]*$'
         size:
           title: Size
           type: string
-          description: Sizing tier. Matches the platform's Database XRD exactly.
+          description: Start small; you can resize later.
           enum:
             - small
             - medium

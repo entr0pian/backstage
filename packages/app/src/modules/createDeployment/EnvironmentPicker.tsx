@@ -5,6 +5,7 @@ import MenuItem from '@material-ui/core/MenuItem';
 import Select from '@material-ui/core/Select';
 import { configApiRef, useApi } from '@backstage/core-plugin-api';
 import type { FieldExtensionComponentProps } from '@backstage/plugin-scaffolder-react';
+import { accentGradient, environmentAccent } from '../platformUi/environmentAccent';
 
 // Environments come from one list in app-config (platform.environments),
 // not an enum in the template — adding a cluster is a config change only.
@@ -34,6 +35,18 @@ export const EnvironmentPicker = ({
       >
         {environments.map(env => (
           <MenuItem key={env} value={env}>
+            {/* The environment's own colour, as on its cards and chips. */}
+            <span
+              aria-hidden
+              style={{
+                width: 10,
+                height: 10,
+                borderRadius: '50%',
+                marginRight: 10,
+                display: 'inline-block',
+                background: accentGradient(environmentAccent(env)),
+              }}
+            />
             {env}
           </MenuItem>
         ))}

@@ -4,11 +4,8 @@ metadata:
   name: create-deployment
   title: Create deployment
   description: >-
-    Deploy a version of a platform component to an environment by opening a
-    pull request against application-repositories with its Release. Creates
-    the Release for a new environment, or updates the version/bindings of an
-    existing one. Backstage creates nothing in the cluster — once the PR is
-    merged, release-operator and Argo CD deploy it.
+    Ship a built version of a service to an environment. Opens a pull request
+    with its Release; once it's merged, Argo CD rolls it out.
 spec:
   owner: user:guest
   type: deployment
@@ -23,29 +20,23 @@ spec:
         componentName:
           title: Component
           type: string
-          description: >-
-            The platform component to deploy. Derived from the Catalog entity
-            you launched this from — not editable here.
+          description: The service to deploy.
           ui:disabled: true
         environment:
           title: Environment
           type: string
-          description: The environments listed in platform.environments (app-config).
+          description: Where it should run.
           ui:field: PlatformEnvironmentPicker
         version:
           title: Version
           type: string
-          description: >-
-            A commit on main whose CI succeeded — its image is tagged with the
-            commit SHA.
+          description: Any commit on main with a green build.
           pattern: '^[0-9a-f]{40}$'
           ui:field: PlatformVersionPicker
         bindings:
           title: Bind dependencies
           type: object
-          description: >-
-            The component's dependencies in the chosen environment. The
-            running service gets their connection details.
+          description: Infrastructure in that environment the service should connect to.
           ui:field: PlatformDependencyBindingsPicker
 
   steps:

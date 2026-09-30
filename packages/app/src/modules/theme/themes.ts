@@ -90,7 +90,7 @@ const components = (mode: Mode) => {
             backgroundImage: dark
               ? 'radial-gradient(900px 500px at 100% -10%, rgba(34, 211, 238, 0.08), transparent 60%), radial-gradient(800px 500px at 20% 0%, rgba(99, 102, 241, 0.12), transparent 60%)'
               : 'radial-gradient(900px 500px at 100% -10%, rgba(34, 211, 238, 0.10), transparent 60%), radial-gradient(800px 500px at 20% 0%, rgba(99, 102, 241, 0.10), transparent 60%)',
-            backgroundAttachment: 'fixed',
+            backgroundRepeat: 'no-repeat',
           },
           '@keyframes platformFadeUp': {
             from: { opacity: 0, transform: 'translateY(8px)' },
@@ -215,6 +215,111 @@ const components = (mode: Mode) => {
     MuiTab: {
       styleOverrides: {
         root: { textTransform: 'none', fontWeight: 600, letterSpacing: 0 },
+      },
+    },
+    // Form fields (scaffolder templates and every other form): soft filled
+    // boxes with a focus ring instead of Material's underline, and the label
+    // always above the field rather than floating inside it.
+    MuiInput: {
+      styleOverrides: {
+        root: {
+          backgroundColor: dark ? 'rgba(148, 163, 184, 0.06)' : '#f8f9fe',
+          border: `1px solid ${border}`,
+          borderRadius: 12,
+          padding: '2px 14px',
+          transition: 'border-color 150ms ease, box-shadow 150ms ease, background-color 150ms ease',
+          '&:hover:not(.Mui-disabled)': { borderColor: dark ? brand.indigoLight : brand.indigo },
+          '&.Mui-focused': {
+            borderColor: dark ? brand.indigoLight : brand.indigo,
+            boxShadow: `0 0 0 4px ${dark ? 'rgba(129, 140, 248, 0.2)' : 'rgba(99, 102, 241, 0.15)'}`,
+            backgroundColor: dark ? '#121829' : '#ffffff',
+          },
+          '&.Mui-error': { borderColor: dark ? '#f87171' : '#dc2626' },
+          '&.Mui-disabled': { opacity: 0.75 },
+        },
+        formControl: { 'label + &': { marginTop: 26 } },
+        input: { padding: '10px 0' },
+        underline: {
+          '&:before, &:after, &:hover:not(.Mui-disabled):before': { display: 'none' },
+        },
+      },
+    },
+    MuiInputLabel: {
+      styleOverrides: {
+        formControl: { transform: 'none' },
+        shrink: { transform: 'none' },
+        root: {
+          fontFamily: displayFont,
+          fontWeight: 700,
+          fontSize: '0.88rem',
+          color: dark ? '#cbd5e1' : '#334155',
+          '&.Mui-focused': { color: dark ? brand.indigoLight : brand.indigoDeep },
+        },
+      },
+    },
+    MuiFormHelperText: {
+      styleOverrides: {
+        root: { fontSize: '0.78rem', marginTop: 6, color: muted },
+      },
+    },
+    MuiSelect: {
+      styleOverrides: {
+        icon: { right: 10, color: muted },
+        select: { '&:focus': { backgroundColor: 'transparent' } },
+      },
+    },
+    MuiMenuItem: {
+      styleOverrides: {
+        root: {
+          borderRadius: 8,
+          margin: '2px 6px',
+          '&.Mui-selected, &.Mui-selected:hover': {
+            backgroundColor: dark ? 'rgba(129, 140, 248, 0.16)' : 'rgba(99, 102, 241, 0.1)',
+            fontWeight: 600,
+          },
+        },
+      },
+    },
+    // Template steps: bigger numbered dots, a thick connector that fills in
+    // the brand colour as steps are done.
+    MuiStepper: {
+      styleOverrides: {
+        root: { backgroundColor: 'transparent' },
+      },
+    },
+    MuiStepIcon: {
+      styleOverrides: {
+        root: {
+          width: 32,
+          height: 32,
+          color: dark ? 'rgba(148, 163, 184, 0.3)' : '#d7dbe8',
+          transition: `transform 250ms ${spring}, color 200ms ease`,
+          '&.MuiStepIcon-active': {
+            color: dark ? brand.indigoLight : brand.indigo,
+            transform: 'scale(1.12)',
+            filter: `drop-shadow(0 4px 10px ${dark ? 'rgba(129, 140, 248, 0.5)' : 'rgba(99, 102, 241, 0.45)'})`,
+          },
+          '&.MuiStepIcon-completed': { color: dark ? brand.cyan : brand.cyanDeep },
+        },
+        text: { fontFamily: displayFont, fontWeight: 800, fontSize: '0.8rem' },
+      },
+    },
+    MuiStepConnector: {
+      styleOverrides: {
+        alternativeLabel: { top: 15, left: 'calc(-50% + 26px)', right: 'calc(50% + 26px)' },
+        line: { borderColor: border, borderTopWidth: 3, borderRadius: 3 },
+        active: { '& $line': { borderColor: dark ? brand.indigoLight : brand.indigo } },
+        completed: { '& $line': { borderColor: dark ? brand.cyan : brand.cyanDeep } },
+      },
+    },
+    MuiStepLabel: {
+      styleOverrides: {
+        label: {
+          fontFamily: displayFont,
+          fontWeight: 600,
+          '&.MuiStepLabel-active': { fontWeight: 800 },
+          '&.MuiStepLabel-completed': { fontWeight: 700 },
+        },
       },
     },
     MuiOutlinedInput: {
