@@ -16,7 +16,7 @@ import type { EntityHeaderLayoutProps } from '@backstage/plugin-catalog-react/al
 import { useDeployments } from '../deployments/useDeployments';
 import { EnvironmentHealthPill } from '../metrics/EnvironmentPulse';
 import { useGrafanaUiUrl, serviceOverviewUrl } from '../metrics/grafana';
-import { argoApplicationUrl, useArgocdUiUrl } from '../platformUi/argocd';
+import { argoApplicationUrl, argoApplicationsUrl, useArgocdUiUrl } from '../platformUi/argocd';
 import { shortVersion } from '../platformUi';
 import { brand } from '../theme/themes';
 
@@ -56,14 +56,6 @@ const useStyles = makeStyles(theme => ({
     alignItems: 'center',
     gap: theme.spacing(1),
     marginTop: theme.spacing(2),
-  },
-  version: {
-    fontFamily: 'monospace',
-    fontSize: '0.78rem',
-    padding: theme.spacing(0.5, 1.25),
-    borderRadius: 999,
-    backgroundColor: 'rgba(11, 16, 32, 0.28)',
-    border: '1px solid rgba(255,255,255,0.18)',
   },
   links: { display: 'flex', alignItems: 'center', gap: theme.spacing(0.5) },
   linkButton: {
@@ -165,13 +157,18 @@ export const ServiceHeader = ({ tabs, activeTabId }: EntityHeaderLayoutProps) =>
   const [menu, setMenu] = useState<HTMLElement | null>(null);
 
   const envs = deployments.status === 'done' ? deployments.deployments : [];
-  const primary = envs[0];
+  const only = envs.length === 1 ? envs[0] : undefined;
   const slug = entity.metadata.annotations?.['github.com/project-slug'];
   const owner = (entity.spec?.owner as string | undefined)?.replace(/^group:(default\/)?/, '');
-  const grafanaUrl = primary ? serviceOverviewUrl(grafanaUiUrl, name, primary.environment) : null;
-  const argoUrl = primary
-    ? argoApplicationUrl(argocdUiUrl, { name: primary.argoApplicationName, namespace: primary.argoApplicationNamespace })
-    : null;
+  // One environment: link straight to it. Several: Grafana lets the viewer
+  // pick the environment, and Argo CD lists every environment's Application.
+  const grafanaUrl = envs.length ? serviceOverviewUrl(grafanaUiUrl, name, only?.environment) : null;
+  let argoUrl: string | null = null;
+  if (only) {
+    argoUrl = argoApplicationUrl(argocdUiUrl, { name: only.argoApplicationName, namespace: only.argoApplicationNamespace });
+  } else if (envs.length) {
+    argoUrl = argoApplicationsUrl(argocdUiUrl, { component: name, type: 'service' });
+  }
   const base = `/catalog/${entity.metadata.namespace ?? 'default'}/component/${name}`;
 
   return (
@@ -210,10 +207,10 @@ export const ServiceHeader = ({ tabs, activeTabId }: EntityHeaderLayoutProps) =>
               component={name}
               environment={d.environment}
               href={`${base}/metrics`}
+              version={d.version ? shortVersion(d.version) : null}
               onBrand
             />
           ))}
-          {primary?.version && <span className={classes.version}>{shortVersion(primary.version)}</span>}
           <Box flex={1} />
           <div className={classes.links}>
             {slug && (

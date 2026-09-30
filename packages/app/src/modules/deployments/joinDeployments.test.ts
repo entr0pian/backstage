@@ -170,4 +170,17 @@ describe('joinDeployments', () => {
     );
     expect(result.map(d => d.environment)).toEqual(['dev', 'prod']);
   });
+
+  it('lists environments in the configured order', () => {
+    const result = joinDeployments(
+      ['dev', 'prod', 'management'].map(environment => ({
+        environment,
+        version: 'v1',
+        releaseName: `payments-${environment}`,
+      })),
+      [],
+      ['management', 'dev', 'prod'],
+    );
+    expect(result.map(d => d.environment)).toEqual(['management', 'dev', 'prod']);
+  });
 });

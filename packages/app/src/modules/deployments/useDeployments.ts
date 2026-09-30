@@ -7,6 +7,7 @@ import {
   type ReleaseVersion,
 } from './joinDeployments';
 import { fetchArgoApplications } from '../platformUi/argocd';
+import { useEnvironmentOrder } from '../platformUi/environments';
 
 export type DeploymentsState =
   | { status: 'loading' }
@@ -22,6 +23,8 @@ export type DeploymentsState =
 export function useDeployments(component: string): DeploymentsState {
   const discoveryApi = useApi(discoveryApiRef);
   const fetchApi = useApi(fetchApiRef);
+  const environmentOrder = useEnvironmentOrder();
+  const orderKey = environmentOrder.join(',');
 
   const [state, setState] = useState<DeploymentsState>({ status: 'loading' });
 
@@ -57,7 +60,7 @@ export function useDeployments(component: string): DeploymentsState {
         if (!cancelled) {
           setState({
             status: 'done',
-            deployments: joinDeployments(releasesBody.releases, argoApps),
+            deployments: joinDeployments(releasesBody.releases, argoApps, orderKey ? orderKey.split(',') : []),
           });
         }
       } catch (error) {
@@ -70,7 +73,7 @@ export function useDeployments(component: string): DeploymentsState {
     return () => {
       cancelled = true;
     };
-  }, [discoveryApi, fetchApi, component]);
+  }, [discoveryApi, fetchApi, component, orderKey]);
 
   return state;
 }

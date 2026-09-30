@@ -70,11 +70,14 @@ export const EnvironmentHealthPill = ({
   component,
   environment,
   href,
+  version,
   onBrand,
 }: {
   component: string;
   environment: string;
   href: string;
+  // The environment's running version (short SHA), shown after its status.
+  version?: string | null;
   onBrand?: boolean;
 }) => {
   const classes = useStyles();
@@ -102,6 +105,7 @@ export const EnvironmentHealthPill = ({
         />
         {environment}
         <span style={{ opacity: 0.8, fontWeight: 500 }}>· {overall ? LABEL[overall] : '…'}</span>
+        {version && <span style={{ opacity: 0.8, fontWeight: 500, fontFamily: 'monospace' }}>· {version}</span>}
       </Link>
     </Tooltip>
   );

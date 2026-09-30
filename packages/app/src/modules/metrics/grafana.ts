@@ -11,17 +11,19 @@ export function useGrafanaUiUrl(): string | undefined {
   return useApi(configApiRef).getOptionalString('platform.grafanaUiUrl');
 }
 
+// Without an environment, Grafana preselects the component's first one and
+// the viewer switches from there.
 export function serviceOverviewUrl(
   uiUrl: string | undefined,
   component: string,
-  environment: string,
+  environment?: string,
 ): string | null {
   if (!uiUrl) {
     return null;
   }
-  const params = new URLSearchParams({
-    'var-component': component,
-    'var-environment': environment,
-  });
+  const params = new URLSearchParams({ 'var-component': component });
+  if (environment) {
+    params.set('var-environment', environment);
+  }
   return `${uiUrl.replace(/\/+$/, '')}/d/${SERVICE_OVERVIEW_DASHBOARD_UID}?${params}`;
 }

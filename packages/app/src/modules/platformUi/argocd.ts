@@ -101,6 +101,16 @@ export function useArgocdUiUrl(): string | undefined {
   return useApi(configApiRef).getOptionalString('platform.argocdUiUrl');
 }
 
+// Argo CD's application list, filtered by platform labels — e.g. every
+// environment's Application of one component.
+export function argoApplicationsUrl(uiUrl: string | undefined, selector: PlatformSelector): string | null {
+  if (!uiUrl) {
+    return null;
+  }
+  const params = new URLSearchParams({ labels: platformSelector(selector) });
+  return `${uiUrl.replace(/\/+$/, '')}/applications?${params}`;
+}
+
 export function argoApplicationUrl(
   uiUrl: string | undefined,
   app: ArgoApplicationRef | null,

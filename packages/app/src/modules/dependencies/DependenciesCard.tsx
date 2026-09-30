@@ -1,172 +1,88 @@
+import { Fragment } from 'react';
 import Box from '@material-ui/core/Box';
 import List from '@material-ui/core/List';
 import ListItem from '@material-ui/core/ListItem';
 import Typography from '@material-ui/core/Typography';
 import { makeStyles } from '@material-ui/core/styles';
-import StorageIcon from '@material-ui/icons/Storage';
-import CategoryIcon from '@material-ui/icons/Category';
-import {
-  InfoCard,
-  Progress,
-  ResponseErrorPanel,
-  StatusError,
-  StatusOK,
-  StatusPending,
-} from '@backstage/core-components';
-import { RELATION_DEPENDS_ON, type Entity } from '@backstage/catalog-model';
-import {
-  EntityRefLink,
-  useEntity,
-  useRelatedEntities,
-} from '@backstage/plugin-catalog-react';
-import { groupByType } from './groupByType';
+import { InfoCard, Progress, ResponseErrorPanel } from '@backstage/core-components';
+import { EntityRefLink } from '@backstage/plugin-catalog-react';
 import { EnvironmentChip } from '../platformUi';
-import { useDatabaseDetails } from '../databases/useDatabaseDetails';
+import { useDependencies } from './useDependencies';
 
 const useStyles = makeStyles(theme => ({
-  groupLabel: {
-    color: theme.palette.text.secondary,
-    display: 'block',
-    marginTop: theme.spacing(1),
-  },
   row: {
-    display: 'flex',
+    display: 'grid',
+    gridTemplateColumns: 'minmax(110px, auto) 1fr',
     alignItems: 'center',
     gap: theme.spacing(2),
-    padding: theme.spacing(1.25, 1),
+    padding: theme.spacing(1.5, 1),
   },
-  icon: {
-    color: theme.palette.primary.main,
-    backgroundColor: theme.palette.action.hover,
-    borderRadius: theme.shape.borderRadius,
-    padding: theme.spacing(0.75),
-    boxSizing: 'content-box',
-  },
-  main: {
-    flex: 1,
+  names: {
     minWidth: 0,
-  },
-  name: {
-    fontWeight: 600,
   },
 }));
 
-// Live status line for a platform Database, from the same guest-safe route
-// the Database page uses (BACKSTAGE_PART9.md Part B).
-const DatabaseStatus = ({ namespace, name }: { namespace: string; name: string }) => {
-  const state = useDatabaseDetails(namespace, name);
-  if (state.status === 'loading') {
-    return (
-      <Typography variant="caption" color="textSecondary">
-        checking…
-      </Typography>
-    );
-  }
-  if (state.status === 'error') {
-    return <StatusPending>Status unavailable</StatusPending>;
-  }
-  const d = state.details;
-  const facts = [
-    d.engine && [d.engine.engine, d.engine.version].filter(Boolean).join(' '),
-    d.spec.size,
-  ]
-    .filter(Boolean)
-    .join(' · ');
-  return (
-    <Box display="flex" alignItems="center" style={{ gap: 12 }}>
-      {d.ready === true && <StatusOK>Ready</StatusOK>}
-      {d.ready === false && <StatusError>Not ready</StatusError>}
-      {d.ready === null && <StatusPending>Unknown</StatusPending>}
-      {facts && (
-        <Typography variant="caption" color="textSecondary">
-          {facts}
-        </Typography>
-      )}
-    </Box>
-  );
-};
-
-const DependencyRow = ({ dependency }: { dependency: Entity }) => {
-  const classes = useStyles();
-  const annotations = dependency.metadata.annotations ?? {};
-  const environment = annotations['platform.taskapp.io/environment'];
-  const k8sNamespace = annotations['platform.taskapp.io/kubernetes-namespace'];
-  const dbName = annotations['platform.taskapp.io/database-name'];
-  const isPlatformDatabase = dependency.spec?.type === 'database' && k8sNamespace && dbName;
-  const Icon = dependency.spec?.type === 'database' ? StorageIcon : CategoryIcon;
-
-  return (
-    <ListItem className={classes.row} divider>
-      <Icon className={classes.icon} fontSize="small" />
-      <Box className={classes.main}>
-        <Typography variant="body1" className={classes.name} component="div">
-          <EntityRefLink entityRef={dependency} hideIcon />
-        </Typography>
-        {isPlatformDatabase ? (
-          <DatabaseStatus namespace={k8sNamespace} name={dbName} />
-        ) : (
-          dependency.metadata.description && (
-            <Typography variant="caption" color="textSecondary">
-              {dependency.metadata.description}
-            </Typography>
-          )
-        )}
-      </Box>
-      {environment && <EnvironmentChip environment={environment} />}
-    </ListItem>
-  );
-};
-
-// What this service depends on at runtime, grouped by type — each row links
-// to its own page and, for platform Databases, shows live status.
+// Overview summary, like the Deployments card: one row per environment that
+// has dependencies, naming them. Status and details live on the
+// Dependencies tab (the card's footer link).
 export const DependenciesCard = () => {
   const classes = useStyles();
-  const { entity } = useEntity();
-  const { entities, loading, error } = useRelatedEntities(entity, {
-    type: RELATION_DEPENDS_ON,
-    kind: 'resource',
-  });
+  const state = useDependencies();
 
-  if (loading) {
+  if (state.status === 'loading') {
     return (
       <InfoCard title="Dependencies">
         <Progress />
       </InfoCard>
     );
   }
-  if (error) {
+  if (state.status === 'error') {
     return (
       <InfoCard title="Dependencies">
-        <ResponseErrorPanel error={error} />
+        <ResponseErrorPanel error={state.error} />
       </InfoCard>
     );
   }
-  if (!entities || entities.length === 0) {
-    return null;
-  }
-
-  const groups = groupByType(entities);
-  if (groups.length === 0) {
+  const used = state.environments.filter(e => e.count > 0);
+  if (used.length === 0) {
     return null;
   }
 
   return (
-    <InfoCard title="Dependencies" subheader="Infrastructure this service uses">
-      {groups.map(group => (
-        <Box key={group.type}>
-          <Typography variant="overline" className={classes.groupLabel}>
-            {group.label}
-          </Typography>
-          <List disablePadding>
-            {group.entities.map(dependency => (
-              <DependencyRow
-                key={`${dependency.kind}:${dependency.metadata.namespace}/${dependency.metadata.name}`}
-                dependency={dependency}
-              />
-            ))}
-          </List>
-        </Box>
-      ))}
+    <InfoCard
+      title="Dependencies"
+      subheader="Infrastructure this service uses, per environment"
+      deepLink={{ title: 'View dependencies', link: 'dependencies' }}
+    >
+      <List disablePadding>
+        {used.map(({ environment, groups }) => (
+          <ListItem key={environment ?? 'all'} divider className={classes.row}>
+            <Box>
+              {environment ? (
+                <EnvironmentChip environment={environment} />
+              ) : (
+                <Typography variant="body2">All environments</Typography>
+              )}
+            </Box>
+            <Typography variant="body2" className={classes.names} component="div">
+              {groups.map((group, gi) => (
+                <Fragment key={group.type}>
+                  {gi > 0 && ' · '}
+                  <Typography variant="caption" color="textSecondary">
+                    {group.label}:{' '}
+                  </Typography>
+                  {group.entities.map((dependency, i) => (
+                    <Fragment key={dependency.metadata.name}>
+                      {i > 0 && ', '}
+                      <EntityRefLink entityRef={dependency} hideIcon />
+                    </Fragment>
+                  ))}
+                </Fragment>
+              ))}
+            </Typography>
+          </ListItem>
+        ))}
+      </List>
     </InfoCard>
   );
 };

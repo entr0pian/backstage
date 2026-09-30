@@ -11,6 +11,7 @@
 // here reads an Application's name to decide what it belongs to.
 
 import { PLATFORM_LABELS } from '../platformUi/argocd';
+import { compareEnvironments } from '../platformUi/environments';
 
 export interface ReleaseVersion {
   environment: string;
@@ -111,9 +112,12 @@ function deliveryFrom(app: ArgoApplication): ReturnType<typeof emptyDelivery> {
   };
 }
 
+// Sorted by `environmentOrder` (app-config platform.environments), so every
+// view lists environments the same way; alphabetical when it's empty.
 export function joinDeployments(
   releases: ReleaseVersion[],
   argoApps: ArgoApplication[],
+  environmentOrder: string[] = [],
 ): Deployment[] {
   const byEnvironment = new Map<string, Deployment>();
 
@@ -148,7 +152,6 @@ export function joinDeployments(
     }
   }
 
-  return [...byEnvironment.values()].sort((a, b) =>
-    a.environment.localeCompare(b.environment),
-  );
+  const compare = compareEnvironments(environmentOrder);
+  return [...byEnvironment.values()].sort((a, b) => compare(a.environment, b.environment));
 }

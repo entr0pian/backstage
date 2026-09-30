@@ -107,7 +107,7 @@ describe('ServiceHeader', () => {
       'href',
       '/catalog/default/component/payments/metrics',
     );
-    expect(screen.getByText('9bfb8b8')).toBeInTheDocument();
+    expect(screen.getByText('· 9bfb8b8')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /repository/i })).toHaveAttribute(
       'href',
       'https://github.com/entr0pian/payments',
@@ -118,6 +118,48 @@ describe('ServiceHeader', () => {
     expect(screen.getByRole('link', { name: /argo cd/i })).toHaveAttribute(
       'href',
       'https://argocd.example.dev/applications/argocd/payments-management',
+    );
+  });
+
+  it('shows each environment with its own version, and links that span them', async () => {
+    const management = (useDeployments as jest.Mock)().deployments[0];
+    (useDeployments as jest.Mock).mockReturnValue({
+      status: 'done',
+      deployments: [
+        management,
+        {
+          ...management,
+          environment: 'dev',
+          version: 'abcdef1234567890abcdef1234567890abcdef12',
+          releaseName: 'payments-dev',
+          argoApplicationName: 'payments-dev',
+        },
+      ],
+    });
+    await renderInTestApp(
+      <EntityProvider entity={payments}>
+        <ServiceHeader tabs={tabs} activeTabId="metrics" />
+      </EntityProvider>,
+      {
+        apis: [mockApis.fetch(), mockApis.discovery(), [starredEntitiesApiRef, starred]],
+        config: {
+          platform: {
+            grafanaUiUrl: 'https://grafana.example.dev',
+            argocdUiUrl: 'https://argocd.example.dev',
+          },
+        },
+      },
+    );
+    await waitFor(() => expect(screen.getByRole('link', { name: /^dev:/ })).toBeInTheDocument());
+    expect(screen.getByRole('link', { name: /^management:/ })).toHaveTextContent('9bfb8b8');
+    expect(screen.getByRole('link', { name: /^dev:/ })).toHaveTextContent('abcdef1');
+    const grafana = screen.getByRole('link', { name: /grafana/i }).getAttribute('href');
+    expect(grafana).toContain('var-component=payments');
+    expect(grafana).not.toContain('var-environment');
+    expect(screen.getByRole('link', { name: /argo cd/i }).getAttribute('href')).toBe(
+      `https://argocd.example.dev/applications?labels=${encodeURIComponent(
+        'platform.taskapp.io/component=payments,platform.taskapp.io/type=service',
+      )}`,
     );
   });
 
