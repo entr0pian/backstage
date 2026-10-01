@@ -2,9 +2,9 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { discoveryApiRef, fetchApiRef, useApi } from '@backstage/core-plugin-api';
 import type { ObservabilitySummary } from './summary';
 
-// Prometheus scrapes services every 30s; polling at half that means a new
-// scrape shows up here within ~15s of Prometheus having it. Faster buys
-// nothing but load.
+// Prometheus scrapes services every 30s and remote-writes to Mimir within
+// seconds; polling at half the scrape interval means a new scrape shows up
+// here within ~15s of Mimir having it. Faster buys nothing but load.
 export const REFRESH_INTERVAL_MS = 15_000;
 
 export interface ObservabilitySummaryState {

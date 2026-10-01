@@ -56,9 +56,13 @@ data:
     platform:
       {{- with .Values.observability.prometheusUrl }}
       # Metrics tab's fixed-query backend route (OBSERVABILLITY_PART4.md
-      # Part 3). Cluster-internal; Prometheus is never exposed publicly.
+      # Part 3): a cluster-internal Prometheus-compatible query API (Mimir,
+      # OBSERVABILLITY_PART9.md). The browser never reaches it directly.
       observability:
         prometheusUrl: {{ . | quote }}
+        {{- with $.Values.observability.tenant }}
+        tenant: {{ . | quote }}
+        {{- end }}
       {{- end }}
       {{- with .Values.environments }}
       # Create deployment's Environment picker (and the Home page count).

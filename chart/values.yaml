@@ -92,10 +92,13 @@ platformCatalog:
   gitopsRepoUrl: "https://github.com/entr0pian/application-repositories"
 
 observability:
-  # Cluster-internal Prometheus for the Metrics tab's backend route, e.g.
-  # http://kube-prometheus-stack-prometheus.monitoring.svc:9090. Empty
-  # leaves the route unregistered.
+  # Cluster-internal Prometheus-compatible query API for the Metrics tab's
+  # backend route: the base URL /api/v1/query is appended to, e.g. Mimir's
+  # http://mimir-query-frontend.mimir.svc.cluster.local:8080/prometheus (or a
+  # plain Prometheus' http://<svc>:9090). Empty leaves the route unregistered.
   prometheusUrl: ""
+  # Mimir tenant, sent as X-Scope-OrgID. Empty for a plain Prometheus.
+  tenant: ""
 
 # Environments a component can be deployed to, one per cluster registered
 # with Argo CD (e.g. [management, dev]). Rendered as platform.environments,

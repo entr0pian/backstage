@@ -1,6 +1,8 @@
-// Minimal query client for the cluster-internal Prometheus. Only
-// ObservabilitySummary calls it, with its own fixed queries — there is no
-// route that forwards a caller's PromQL here.
+// Minimal client for a Prometheus-compatible query API: in the cluster,
+// Mimir's in-cluster query-frontend (the central store every environment's
+// Prometheus remote-writes to); a plain Prometheus works too, e.g. locally.
+// Only ObservabilitySummary calls it, with its own fixed queries; no route
+// forwards a caller's PromQL here.
 
 // [unix seconds, value]
 export type Point = [number, number];
@@ -19,11 +21,29 @@ interface PrometheusResponse<T> {
   data?: { resultType: string; result: T[] };
 }
 
+export interface PrometheusClientOptions {
+  // Sent as X-Scope-OrgID on every query: the Mimir tenant to read. Leave
+  // unset for a plain Prometheus, which has no tenants.
+  tenant?: string;
+  timeoutMs?: number;
+}
+
 export class PrometheusClient implements PrometheusQueryClient {
+  private readonly headers: Record<string, string>;
+  private readonly timeoutMs: number;
+
+  // baseUrl is what /api/v1/query is appended to: http://host:9090 for
+  // Prometheus, http://host:8080/prometheus for Mimir.
   constructor(
     private readonly baseUrl: string,
-    private readonly timeoutMs = 5000,
-  ) {}
+    { tenant, timeoutMs = 5000 }: PrometheusClientOptions = {},
+  ) {
+    this.headers = { 'Content-Type': 'application/x-www-form-urlencoded' };
+    if (tenant) {
+      this.headers['X-Scope-OrgID'] = tenant;
+    }
+    this.timeoutMs = timeoutMs;
+  }
 
   private async request<T>(
     path: string,
@@ -32,7 +52,7 @@ export class PrometheusClient implements PrometheusQueryClient {
   ): Promise<T[]> {
     const res = await fetch(`${this.baseUrl.replace(/\/+$/, '')}${path}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      headers: this.headers,
       body: new URLSearchParams(params),
       signal: AbortSignal.timeout(this.timeoutMs),
     });

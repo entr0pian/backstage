@@ -30,7 +30,8 @@ import { createObservabilityRouter } from '../observabilitySummary/router';
 // Separately, GET /api/platform/observability/components/:component/
 // environments/:environment (the Metrics tab, OBSERVABILLITY_PART4.md
 // Part 3) is registered whenever platform.observability.prometheusUrl is
-// set, regardless of platformCatalog — it only needs Prometheus.
+// set, regardless of platformCatalog — it only needs a Prometheus-compatible
+// query API (Mimir in the cluster, OBSERVABILLITY_PART9.md).
 export const releaseVersionsModule = createBackendPlugin({
   pluginId: 'platform',
   register(reg) {
@@ -46,8 +47,12 @@ export const releaseVersionsModule = createBackendPlugin({
       async init({ config, httpRouter, httpAuth, permissions, logger, catalog }) {
         const prometheusUrl = config.getOptionalString('platform.observability.prometheusUrl');
         if (prometheusUrl) {
+          const tenant = config.getOptionalString('platform.observability.tenant');
           httpRouter.use(
-            createObservabilityRouter({ prometheus: new PrometheusClient(prometheusUrl), logger }),
+            createObservabilityRouter({
+              prometheus: new PrometheusClient(prometheusUrl, { tenant }),
+              logger,
+            }),
           );
         } else {
           logger.info(

@@ -13,12 +13,22 @@ export interface Config {
      */
     grafanaUiUrl?: string;
     /**
-     * Backend only (never sent to the browser): cluster-internal Prometheus
-     * the Metrics tab's fixed queries run against. Unset, the Metrics route
-     * isn't registered.
+     * Backend only (never sent to the browser): the Prometheus-compatible
+     * query API the Metrics tab's fixed queries run against. Unset, the
+     * Metrics route isn't registered.
      */
     observability?: {
+      /**
+       * Base URL that /api/v1/query is appended to, e.g. Mimir's
+       * http://mimir-query-frontend.mimir.svc.cluster.local:8080/prometheus
+       * or a plain Prometheus' http://localhost:9090.
+       */
       prometheusUrl?: string;
+      /**
+       * Mimir tenant, sent as X-Scope-OrgID on every query. Omit for a
+       * plain Prometheus.
+       */
+      tenant?: string;
     };
     /**
      * Environments a component can be deployed to — the Create deployment
