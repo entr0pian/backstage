@@ -71,11 +71,6 @@ const useStyles = makeStyles(theme => ({
     borderRadius: theme.shape.borderRadius * 2,
     border: `1px solid ${theme.palette.divider}`,
     backgroundColor: theme.palette.background.default,
-    transition: 'transform 200ms cubic-bezier(.34,1.56,.64,1), border-color 200ms ease, background-color 200ms ease',
-    '&:hover': {
-      transform: 'translateY(-2px)',
-      backgroundColor: theme.palette.background.paper,
-    },
   },
   labelRow: {
     display: 'flex',

@@ -24,12 +24,10 @@ const useStyles = makeStyles(theme => ({
     gap: theme.spacing(2),
     padding: theme.spacing(1.25, 1.5),
     borderRadius: 12,
-    transition: 'background-color 150ms ease, transform 200ms cubic-bezier(.34,1.56,.64,1)',
+    transition: 'background-color 150ms ease',
     '&:hover': {
       backgroundColor: theme.palette.type === 'dark' ? 'rgba(129,140,248,0.08)' : 'rgba(99,102,241,0.05)',
-      transform: 'translateX(4px)',
     },
-    '&:hover $icon': { transform: 'rotate(-8deg) scale(1.1)' },
   },
   icon: {
     color: theme.palette.primary.main,

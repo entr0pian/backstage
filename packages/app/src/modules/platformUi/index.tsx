@@ -21,8 +21,6 @@ const useStyles = makeStyles(theme => ({
     color: '#fff',
     border: 0,
     borderRadius: 999,
-    transition: 'transform 200ms cubic-bezier(.34,1.56,.64,1)',
-    '&:hover': { transform: 'scale(1.06)' },
   },
   version: {
     fontFamily: 'monospace',

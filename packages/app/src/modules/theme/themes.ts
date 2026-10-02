@@ -73,9 +73,6 @@ const components = (mode: Mode) => {
   const cardShadow = dark
     ? '0 1px 2px rgba(0, 0, 0, 0.4)'
     : '0 1px 2px rgba(15, 23, 42, 0.04), 0 4px 16px -6px rgba(15, 23, 42, 0.08)';
-  const cardShadowHover = dark
-    ? '0 18px 40px -18px rgba(99, 102, 241, 0.55), 0 0 0 1px rgba(129, 140, 248, 0.35)'
-    : '0 18px 40px -18px rgba(79, 70, 229, 0.35), 0 0 0 1px rgba(99, 102, 241, 0.22)';
   // Cards aren't flat white: a faint brand wash fades in from the top.
   const cardSurface = dark
     ? 'linear-gradient(180deg, rgba(99, 102, 241, 0.08) 0%, rgba(18, 24, 41, 0) 140px)'
@@ -147,20 +144,15 @@ const components = (mode: Mode) => {
         elevation2: { boxShadow: cardShadow, border: `1px solid ${border}` },
       },
     },
-    // Cards fade up as a page loads, then lift and pick up a brand glow on
-    // hover.
+    // Cards fade up as a page loads. No hover lift here: most cards aren't
+    // clickable, and motion on hover reads as "click me". Cards that are a
+    // single link (Home golden paths, Catalog service cards) add their own.
     MuiCard: {
       styleOverrides: {
         root: {
           borderRadius: 18,
           backgroundImage: cardSurface,
           animation: 'platformFadeUp 380ms ease both',
-          transition: `transform 250ms ${spring}, box-shadow 250ms ease, border-color 250ms ease`,
-          '&:hover': {
-            transform: 'translateY(-3px)',
-            boxShadow: cardShadowHover,
-            borderColor: 'transparent',
-          },
         },
       },
     },
