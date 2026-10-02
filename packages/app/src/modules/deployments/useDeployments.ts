@@ -1,5 +1,11 @@
 import { useEffect, useState } from 'react';
-import { discoveryApiRef, fetchApiRef, useApi } from '@backstage/core-plugin-api';
+import {
+  discoveryApiRef,
+  fetchApiRef,
+  useApi,
+  type DiscoveryApi,
+  type FetchApi,
+} from '@backstage/core-plugin-api';
 import {
   joinDeployments,
   type ArgoApplication,
@@ -19,7 +25,39 @@ export type DeploymentsState =
 // route (see backend's modules/releaseVersions/). Delivery state comes from
 // @backstage-community/plugin-argocd-backend's own already-installed
 // endpoint — see platform-architecture/BACKSTAGE_PART6.md. Shared by the
-// Overview card and the Deployments tab so both always agree.
+// Overview card (useDeployments) and the Deployments tab (useLiveDeployments)
+// so both always agree.
+export async function loadDeployments(
+  discoveryApi: DiscoveryApi,
+  fetchApi: FetchApi,
+  component: string,
+  environmentOrder: string[],
+): Promise<Deployment[]> {
+  const platformBaseUrl = await discoveryApi.getBaseUrl('platform');
+
+  // The component's workload Applications, found by the shared
+  // platform.taskapp.io/* label contract (see platformUi/argocd.ts).
+  const [releasesRes, argo] = await Promise.all([
+    fetchApi.fetch(`${platformBaseUrl}/releases/${encodeURIComponent(component)}`),
+    fetchArgoApplications<ArgoApplication>(discoveryApi, fetchApi, {
+      component,
+      type: 'service',
+    }),
+  ]);
+
+  if (!releasesRes.ok) {
+    throw new Error(`Release Versions request failed: ${releasesRes.status} ${releasesRes.statusText}`);
+  }
+  const releasesBody: { releases: ReleaseVersion[] } = await releasesRes.json();
+
+  // Argo CD connectivity is allowed to fail independently — still show
+  // Release-derived deployments with Sync/Health as Unknown rather than
+  // losing the whole view, per BACKSTAGE_PART5.md's "Argo unavailable"
+  // behavior, carried over here.
+  return joinDeployments(releasesBody.releases, argo.items, environmentOrder);
+}
+
+// One-shot load, for the Overview card.
 export function useDeployments(component: string): DeploymentsState {
   const discoveryApi = useApi(discoveryApiRef);
   const fetchApi = useApi(fetchApiRef);
@@ -34,34 +72,14 @@ export function useDeployments(component: string): DeploymentsState {
     (async () => {
       setState({ status: 'loading' });
       try {
-        const platformBaseUrl = await discoveryApi.getBaseUrl('platform');
-
-        // The component's workload Applications, found by the shared
-        // platform.taskapp.io/* label contract (see platformUi/argocd.ts).
-        const [releasesRes, argo] = await Promise.all([
-          fetchApi.fetch(`${platformBaseUrl}/releases/${encodeURIComponent(component)}`),
-          fetchArgoApplications<ArgoApplication>(discoveryApi, fetchApi, {
-            component,
-            type: 'service',
-          }),
-        ]);
-
-        if (!releasesRes.ok) {
-          throw new Error(`Release Versions request failed: ${releasesRes.status} ${releasesRes.statusText}`);
-        }
-        const releasesBody: { releases: ReleaseVersion[] } = await releasesRes.json();
-
-        // Argo CD connectivity is allowed to fail independently — still
-        // show Release-derived deployments with Sync/Health as Unknown
-        // rather than losing the whole view, per BACKSTAGE_PART5.md's
-        // "Argo unavailable" behavior, carried over here.
-        const argoApps = argo.items;
-
+        const deployments = await loadDeployments(
+          discoveryApi,
+          fetchApi,
+          component,
+          orderKey ? orderKey.split(',') : [],
+        );
         if (!cancelled) {
-          setState({
-            status: 'done',
-            deployments: joinDeployments(releasesBody.releases, argoApps, orderKey ? orderKey.split(',') : []),
-          });
+          setState({ status: 'done', deployments });
         }
       } catch (error) {
         if (!cancelled) {

@@ -1,0 +1,73 @@
+import {
+  ACTIVE_INTERVAL_MS,
+  IDLE_INTERVAL_MS,
+  phaseLabel,
+  pollInterval,
+  problemLabel,
+  rolloutLine,
+  rolloutPercent,
+} from './progressView';
+import type { DeploymentProgress } from './useEnvironmentDetails';
+
+const W = 'e692041c498a0d4ee4efad2563667d87af3d1fbc';
+const X = 'dd9fc0e4a089f9d8c87140e7dc1f0dc9f4047a5e';
+
+function progress(overrides: Partial<DeploymentProgress>): DeploymentProgress {
+  return {
+    phase: 'RollingOut',
+    targetVersion: X,
+    desiredReplicas: 3,
+    target: { revision: 2, version: X, ready: 2, available: 2 },
+    previous: { revision: 1, version: W, current: 1, ready: 1 },
+    problems: [],
+    ...overrides,
+  };
+}
+
+describe('progressView', () => {
+  it('polls fast only while some environment is mid-deployment', () => {
+    expect(pollInterval(['Healthy', 'RollingOut'])).toBe(ACTIVE_INTERVAL_MS);
+    expect(pollInterval(['Healthy', 'Pending'])).toBe(ACTIVE_INTERVAL_MS);
+    expect(pollInterval(['Healthy', 'Stalled'])).toBe(ACTIVE_INTERVAL_MS);
+    expect(pollInterval(['Healthy', 'RolloutFailed', 'Unknown'])).toBe(IDLE_INTERVAL_MS);
+    expect(pollInterval([])).toBe(IDLE_INTERVAL_MS);
+  });
+
+  it('summarises a rollout in one line', () => {
+    expect(rolloutLine(progress({}))).toBe('e692041 → dd9fc0e · 2 / 3 ready · 1 old pod serving');
+    expect(rolloutLine(progress({ previous: { revision: 1, version: W, current: 0, ready: 0 } }))).toBe(
+      'e692041 → dd9fc0e · 2 / 3 ready',
+    );
+  });
+
+  it('says a pending deployment is waiting, with what still serves', () => {
+    const p = progress({ phase: 'Pending', target: null, previous: { revision: 1, version: W, current: 3, ready: 3 } });
+    expect(rolloutLine(p)).toBe('e692041 → dd9fc0e · waiting for the cluster · 3 old pods serving');
+    expect(rolloutLine(progress({ phase: 'Pending', target: null, previous: null }))).toBe(
+      'dd9fc0e · waiting for the cluster',
+    );
+  });
+
+  it('shows a configuration-only rollout as the same version on both sides', () => {
+    const p = progress({ previous: { revision: 3, version: X, current: 2, ready: 2 } });
+    expect(rolloutLine(p)).toBe('dd9fc0e → dd9fc0e · 2 / 3 ready · 2 old pods serving');
+  });
+
+  it('measures the bar against the desired replicas', () => {
+    expect(rolloutPercent(progress({}))).toBe(67);
+    expect(rolloutPercent(progress({ target: null }))).toBeNull();
+    expect(rolloutPercent(progress({ desiredReplicas: 0 }))).toBeNull();
+  });
+
+  it('labels an unreachable cluster as unavailable, not failed', () => {
+    expect(phaseLabel(progress({ phase: 'Unknown' }), false)).toBe('Cluster unavailable');
+    expect(phaseLabel(progress({ phase: 'Unknown' }), true)).toBe('Unknown');
+    expect(phaseLabel(progress({ phase: 'Stalled' }), true)).toBe('Needs attention');
+  });
+
+  it('names problem kinds, and falls back to the raw reason', () => {
+    expect(problemLabel('ImagePull', 'ImagePullBackOff')).toBe('Image pull problem');
+    expect(problemLabel('CrashLoop', 'CrashLoopBackOff (last exit: Error)')).toBe('Container keeps crashing');
+    expect(problemLabel('Other', 'CreateContainerConfigError')).toBe('CreateContainerConfigError');
+  });
+});

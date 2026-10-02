@@ -2,21 +2,34 @@ import { useState, type ReactNode } from 'react';
 import Box from '@material-ui/core/Box';
 import Button from '@material-ui/core/Button';
 import Grid from '@material-ui/core/Grid';
+import LinearProgress from '@material-ui/core/LinearProgress';
 import Tooltip from '@material-ui/core/Tooltip';
 import Typography from '@material-ui/core/Typography';
 import OpenInNewIcon from '@material-ui/icons/OpenInNew';
-import { makeStyles, useTheme } from '@material-ui/core/styles';
+import { makeStyles } from '@material-ui/core/styles';
 import { displayFont } from '../theme/themes';
 import CloudUploadIcon from '@material-ui/icons/CloudUpload';
 import RocketIcon from '@material-ui/icons/FlightTakeoff';
-import { LinkButton, Progress, ResponseErrorPanel } from '@backstage/core-components';
+import {
+  LinkButton,
+  Progress,
+  ResponseErrorPanel,
+  StatusAborted,
+  StatusError,
+  StatusOK,
+  StatusPending,
+  StatusRunning,
+  StatusWarning,
+} from '@backstage/core-components';
 import { taskCreatePermission } from '@backstage/plugin-scaffolder-common/alpha';
 import { useEntity } from '@backstage/plugin-catalog-react';
 import { kubernetesProxyPermission } from '@backstage/plugin-kubernetes-common';
 import { usePermission } from '@backstage/plugin-permission-react';
 import { type Deployment } from './joinDeployments';
 import { argoApplicationUrl, useArgocdUiUrl } from '../platformUi/argocd';
-import { useDeployments } from './useDeployments';
+import { useLiveDeployments } from './useLiveDeployments';
+import type { EnvironmentDetails } from './useEnvironmentDetails';
+import { phaseLabel, problemLabel, rolloutLine, rolloutPercent } from './progressView';
 import { LogsDialog } from './LogsDialog';
 import { DetailsDrawer } from './DetailsDrawer';
 import {
@@ -96,17 +109,15 @@ const useStyles = makeStyles(theme => ({
     fontSize: '0.85rem',
   },
   detailKey: { color: theme.palette.text.secondary, marginRight: theme.spacing(1) },
-  history: { listStyle: 'none', margin: 0, padding: 0 },
-  historyItem: {
-    display: 'grid',
-    gridTemplateColumns: '16px 90px 1fr auto',
+  rolloutLine: { fontFamily: 'monospace', fontSize: '0.9rem' },
+  rolloutBar: { height: 6, borderRadius: 3, margin: theme.spacing(1, 0) },
+  problem: {
+    display: 'flex',
     alignItems: 'center',
-    gap: theme.spacing(1.5),
-    padding: theme.spacing(0.75, 0),
+    flexWrap: 'wrap',
+    gap: theme.spacing(1),
     fontSize: '0.85rem',
-    '& + &': { borderTop: `1px solid ${theme.palette.divider}` },
   },
-  historyDot: { width: 8, height: 8, borderRadius: '50%', justifySelf: 'center' },
   footer: {
     display: 'flex',
     justifyContent: 'space-between',
@@ -128,34 +139,105 @@ const Tile = ({ label, value, context }: { label: string; value: ReactNode; cont
   );
 };
 
+function rolloutContext(details: EnvironmentDetails | undefined): string | undefined {
+  if (!details) return undefined;
+  if (!details.cluster.reachable) return 'Workload cluster unavailable';
+  const { target, desiredReplicas } = details.progress;
+  return target ? `${target.ready} / ${desiredReplicas} ready` : undefined;
+}
+
+// The rollout phase (backend DeploymentProgress) as a status indicator.
+// Unknown is grey, never red: an unreachable cluster isn't a failed deploy.
+const PhaseStatus = ({ details }: { details: EnvironmentDetails }) => {
+  const label = phaseLabel(details.progress, details.cluster.reachable);
+  switch (details.progress.phase) {
+    case 'Healthy':
+      return <StatusOK>{label}</StatusOK>;
+    case 'Pending':
+      return <StatusPending>{label}</StatusPending>;
+    case 'RollingOut':
+      return <StatusRunning>{label}</StatusRunning>;
+    case 'Stalled':
+      return <StatusWarning>{label}</StatusWarning>;
+    case 'RolloutFailed':
+      return <StatusError>{label}</StatusError>;
+    default:
+      return <StatusAborted>{label}</StatusAborted>;
+  }
+};
+
+// Shown while a deployment is in flight or has failed: where it is, what's
+// still serving, and what's wrong with the new pods. Healthy stays compact.
+const RolloutSection = ({
+  details,
+  logsAllowed,
+  onViewLogs,
+}: {
+  details: EnvironmentDetails;
+  logsAllowed: boolean;
+  onViewLogs: (podName: string) => void;
+}) => {
+  const classes = useStyles();
+  const { progress } = details;
+  const percent = rolloutPercent(progress);
+  return (
+    <>
+      <Typography className={classes.section}>Rollout</Typography>
+      <Typography className={classes.rolloutLine}>{rolloutLine(progress)}</Typography>
+      {percent !== null && (
+        <LinearProgress
+          className={classes.rolloutBar}
+          variant="determinate"
+          value={percent}
+          color={progress.phase === 'RollingOut' ? 'primary' : 'secondary'}
+        />
+      )}
+      {progress.problems.map(p => (
+        <div key={p.pod} className={classes.problem}>
+          <StatusWarning>{problemLabel(p.kind, p.reason)}</StatusWarning>
+          <span style={{ fontFamily: 'monospace' }}>{p.pod}</span>
+          {logsAllowed && (
+            <Button size="small" color="primary" onClick={() => onViewLogs(p.pod)}>
+              Logs
+            </Button>
+          )}
+        </div>
+      ))}
+    </>
+  );
+};
+
 const EnvironmentCard = ({
   deployment,
+  details,
   argocdUiUrl,
   logsAllowed,
   onViewDetails,
   onViewLogs,
 }: {
   deployment: Deployment;
+  // This environment's summary (rollout progress); absent without a Release
+  // or until it first loads, when the card falls back to Argo CD health.
+  details?: EnvironmentDetails;
   argocdUiUrl?: string;
   logsAllowed: boolean;
   onViewDetails: () => void;
-  onViewLogs: () => void;
+  onViewLogs: (podName?: string) => void;
 }) => {
   const classes = useStyles();
-  const theme = useTheme();
   const pending = !deployment.argoApplicationName;
   const argoUrl = argoApplicationUrl(argocdUiUrl, {
     name: deployment.argoApplicationName,
     namespace: deployment.argoApplicationNamespace,
   });
-  const current = deployment.revision;
+  const progress = details?.progress;
 
   return (
     <PlatformEnvironmentCard
       environment={deployment.environment}
       action={
         <Box pt={2} pr={2}>
-          <HealthStatus status={deployment.healthStatus} pending={pending} />
+          {details ? <PhaseStatus details={details} /> : <HealthStatus status={deployment.healthStatus} pending={pending} />}
         </Box>
       }
     >
@@ -177,16 +259,16 @@ const EnvironmentCard = ({
         </Grid>
         <Grid item xs={12} sm={6} md={3}>
           <Tile
-            label="Sync"
-            value={<SyncStatus status={deployment.syncStatus} pending={pending} />}
-            context={pending ? 'Argo CD application not found' : `Argo CD · ${deployment.argoApplicationName}`}
+            label="Rollout"
+            value={details ? <PhaseStatus details={details} /> : '—'}
+            context={rolloutContext(details)}
           />
         </Grid>
         <Grid item xs={12} sm={6} md={3}>
           <Tile
-            label="Health"
-            value={<HealthStatus status={deployment.healthStatus} pending={pending} />}
-            context="Argo CD resource health"
+            label="Argo CD"
+            value={<SyncStatus status={deployment.syncStatus} pending={pending} />}
+            context={pending ? 'Application not found' : `Health: ${deployment.healthStatus}`}
           />
         </Grid>
         <Grid item xs={12} sm={6} md={3}>
@@ -198,6 +280,10 @@ const EnvironmentCard = ({
         </Grid>
       </Grid>
 
+      {details && progress && progress.phase !== 'Healthy' && progress.phase !== 'Unknown' && (
+        <RolloutSection details={details} logsAllowed={logsAllowed} onViewLogs={onViewLogs} />
+      )}
+
       <Typography className={classes.section}>Details</Typography>
       <div className={classes.details}>
         <span>
@@ -205,42 +291,10 @@ const EnvironmentCard = ({
           {deployment.namespace ?? '—'}
         </span>
         <span>
-          <span className={classes.detailKey}>Revision</span>
-          <span style={{ fontFamily: 'monospace' }}>{current ? current.slice(0, 7) : '—'}</span>
-        </span>
-        <span>
           <span className={classes.detailKey}>Argo Application</span>
           {deployment.argoApplicationName ?? '—'}
         </span>
       </div>
-
-      {deployment.history.length > 0 && (
-        <>
-          <Typography className={classes.section}>Recent syncs</Typography>
-          <ul className={classes.history}>
-            {deployment.history.map((h, i) => {
-              const isCurrent = i === 0;
-              return (
-                <li key={`${h.revision}-${h.deployedAt}`} className={classes.historyItem}>
-                  <span
-                    className={classes.historyDot}
-                    style={{ backgroundColor: isCurrent ? theme.palette.success.main : theme.palette.divider }}
-                  />
-                  <span style={{ fontFamily: 'monospace' }}>{h.revision ? h.revision.slice(0, 7) : '—'}</span>
-                  <Typography variant="body2" color={isCurrent ? 'textPrimary' : 'textSecondary'} component="span">
-                    {isCurrent ? 'Current' : 'Previous'}
-                  </Typography>
-                  <Tooltip title={formatTimestamp(h.deployedAt)}>
-                    <Typography variant="body2" color="textSecondary" component="span">
-                      {timeAgo(h.deployedAt) ?? '—'}
-                    </Typography>
-                  </Tooltip>
-                </li>
-              );
-            })}
-          </ul>
-        </>
-      )}
 
       <div className={classes.footer}>
         <Box display="flex" style={{ gap: 8 }}>
@@ -255,7 +309,7 @@ const EnvironmentCard = ({
                 color="primary"
                 variant="outlined"
                 disabled={pending || !logsAllowed}
-                onClick={onViewLogs}
+                onClick={() => onViewLogs()}
               >
                 Logs
               </Button>
@@ -288,7 +342,7 @@ const EnvironmentCard = ({
 export const DeploymentsContent = () => {
   const { entity } = useEntity();
   const argocdUiUrl = useArgocdUiUrl();
-  const state = useDeployments(entity.metadata.name);
+  const state = useLiveDeployments(entity.metadata.name);
   const [detailsEnvironment, setDetailsEnvironment] = useState<string | null>(null);
   const [logs, setLogs] = useState<{ environment: string; podName?: string } | null>(null);
   // Owner-only by permission policy (the Kubernetes plugin's permissions are
@@ -299,11 +353,8 @@ export const DeploymentsContent = () => {
   // Deploying runs a scaffolder template, which guests can't.
   const { allowed: canDeploy } = usePermission({ permission: taskCreatePermission });
 
-  if (state.status === 'loading') {
-    return <Progress />;
-  }
-  if (state.status === 'error') {
-    return <ResponseErrorPanel error={state.error} />;
+  if (!state.deployments) {
+    return state.error ? <ResponseErrorPanel error={state.error} /> : <Progress />;
   }
   if (state.deployments.length === 0) {
     return (
@@ -333,10 +384,11 @@ export const DeploymentsContent = () => {
         <Grid item xs={12} key={deployment.environment}>
           <EnvironmentCard
             deployment={deployment}
+            details={state.summaries[deployment.environment]}
             argocdUiUrl={argocdUiUrl}
             logsAllowed={logsAllowed}
             onViewDetails={() => setDetailsEnvironment(deployment.environment)}
-            onViewLogs={() => setLogs({ environment: deployment.environment })}
+            onViewLogs={podName => setLogs({ environment: deployment.environment, podName })}
           />
         </Grid>
       ))}

@@ -1,6 +1,21 @@
 import { useCallback, useEffect, useState } from 'react';
 import { discoveryApiRef, fetchApiRef, useApi } from '@backstage/core-plugin-api';
 
+// Mirrors the backend's DeploymentProgress
+// (packages/backend/src/modules/environmentSummary/DeploymentProgress.ts):
+// where the environment's rollout is, derived server-side.
+export type PodProblemKind = 'ImagePull' | 'CrashLoop' | 'Other';
+export type ProgressPhase = 'Pending' | 'RollingOut' | 'Stalled' | 'RolloutFailed' | 'Healthy' | 'Unknown';
+
+export interface DeploymentProgress {
+  phase: ProgressPhase;
+  targetVersion: string | null;
+  desiredReplicas: number;
+  target: { revision: number | null; version: string | null; ready: number; available: number } | null;
+  previous: { revision: number | null; version: string | null; current: number; ready: number } | null;
+  problems: { pod: string; kind: PodProblemKind; reason: string }[];
+}
+
 // Mirrors the backend's EnvironmentSummary
 // (packages/backend/src/modules/environmentSummary/EnvironmentSummary.ts).
 // Optional `message` fields are only present when the caller is the owner —
@@ -9,6 +24,8 @@ export interface EnvironmentDetails {
   component: string;
   environment: string;
   detailLevel: 'owner' | 'summary';
+  cluster: { name: string | null; reachable: boolean };
+  progress: DeploymentProgress;
   release: {
     name: string;
     namespace: string;
@@ -27,10 +44,28 @@ export interface EnvironmentDetails {
       restarts: number;
       createdAt: string | null;
       images: string[];
-      problem: { state: 'waiting' | 'terminated'; reason: string; exitCode?: number } | null;
+      replicaSet: string | null;
+      problem: { kind: PodProblemKind; state: 'waiting' | 'terminated'; reason: string; exitCode?: number } | null;
     }[];
     runningImageTags: string[];
     imageMatchesRelease: boolean | null;
+    deployment: {
+      generation: number | null;
+      observedGeneration: number | null;
+      replicas: number;
+      deadlineExceeded: boolean;
+    } | null;
+    replicaSets: {
+      name: string;
+      namespace: string;
+      revision: number | null;
+      version: string | null;
+      desired: number;
+      current: number;
+      ready: number;
+      available: number;
+      createdAt: string | null;
+    }[];
   };
   networking: {
     services: {
