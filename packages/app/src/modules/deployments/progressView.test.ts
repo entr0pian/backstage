@@ -1,6 +1,8 @@
 import {
   ACTIVE_INTERVAL_MS,
   IDLE_INTERVAL_MS,
+  formatDuration,
+  timingTile,
   phaseLabel,
   pollInterval,
   problemLabel,
@@ -20,6 +22,8 @@ function progress(overrides: Partial<DeploymentProgress>): DeploymentProgress {
     target: { revision: 2, version: X, ready: 2, available: 2 },
     previous: { revision: 1, version: W, current: 1, ready: 1 },
     problems: [],
+    startedAt: null,
+    completedAt: null,
     ...overrides,
   };
 }
@@ -78,5 +82,55 @@ describe('progressView', () => {
     expect(problemLabel('ImagePull', 'ImagePullBackOff')).toBe('Image pull problem');
     expect(problemLabel('CrashLoop', 'CrashLoopBackOff (last exit: Error)')).toBe('Container keeps crashing');
     expect(problemLabel('Other', 'CreateContainerConfigError')).toBe('CreateContainerConfigError');
+  });
+
+  it('formats durations compactly', () => {
+    expect(formatDuration(45_000)).toBe('45s');
+    expect(formatDuration(65_000)).toBe('1m 05s');
+    expect(formatDuration(2 * 3600_000 + 3 * 60_000)).toBe('2h 03m');
+    expect(formatDuration(-5)).toBe('0s');
+  });
+
+  describe('timingTile', () => {
+    const now = new Date('2026-10-02T12:06:14Z').getTime();
+
+    it('says when a healthy rollout finished and how long it took', () => {
+      const t = timingTile(
+        progress({ phase: 'Healthy', startedAt: '2026-10-02T11:51:09Z', completedAt: '2026-10-02T11:52:14Z' }),
+        now,
+      );
+      expect(t).toEqual({ label: 'Rolled out', value: '14m ago', context: 'took 1m 05s' });
+    });
+
+    it('drops the duration when the start is after the finish (pods replaced since)', () => {
+      const t = timingTile(
+        progress({ phase: 'Healthy', startedAt: '2026-10-02T12:00:00Z', completedAt: '2026-10-02T11:52:14Z' }),
+        now,
+      );
+      expect(t).toEqual({ label: 'Rolled out', value: '14m ago', context: null });
+    });
+
+    it('counts up while rolling out or stalled', () => {
+      expect(timingTile(progress({ phase: 'RollingOut', startedAt: '2026-10-02T12:05:34Z' }), now)).toEqual({
+        label: 'Rolling out',
+        value: 'for 40s',
+        context: null,
+      });
+      expect(timingTile(progress({ phase: 'Stalled', startedAt: '2026-10-02T12:01:14Z' }), now)?.value).toBe('for 5m 00s');
+    });
+
+    it('covers pending and failed rollouts', () => {
+      expect(timingTile(progress({ phase: 'Pending', target: null }), now)).toMatchObject({ value: 'waiting' });
+      expect(timingTile(progress({ phase: 'RolloutFailed', startedAt: '2026-10-02T11:56:14Z' }), now)).toEqual({
+        label: 'Rollout',
+        value: 'failed',
+        context: 'started 10m ago',
+      });
+    });
+
+    it('defers to Argo CD when the rollout state is unknown', () => {
+      expect(timingTile(progress({ phase: 'Unknown' }), now)).toBeNull();
+      expect(timingTile(progress({ phase: 'Healthy', completedAt: null }), now)).toBeNull();
+    });
   });
 });

@@ -24,7 +24,9 @@ function paymentsObjects(overrides: Partial<EnvironmentObjects> = {}): Environme
           observedGeneration: 1,
           readyReplicas: 1,
           availableReplicas: 1,
-          conditions: [{ type: 'Progressing', status: 'True', reason: 'NewReplicaSetAvailable' }],
+          conditions: [
+            { type: 'Progressing', status: 'True', reason: 'NewReplicaSetAvailable', lastUpdateTime: new Date('2026-09-24T10:14:30Z') },
+          ],
         },
       },
     ],
@@ -115,7 +117,13 @@ describe('buildEnvironmentSummary', () => {
       expect.objectContaining({ name: 'payments-568c859586', revision: 1, version: SHA, desired: 1, ready: 1 }),
     ]);
     expect(s.cluster).toEqual({ name: 'management', reachable: true });
-    expect(s.progress).toMatchObject({ phase: 'Healthy', targetVersion: SHA, desiredReplicas: 1 });
+    expect(s.progress).toMatchObject({
+      phase: 'Healthy',
+      targetVersion: SHA,
+      desiredReplicas: 1,
+      startedAt: '2026-09-24T10:14:00Z',
+      completedAt: '2026-09-24T10:14:30.000Z',
+    });
     expect(s.networking.services).toEqual([
       {
         name: 'payments',

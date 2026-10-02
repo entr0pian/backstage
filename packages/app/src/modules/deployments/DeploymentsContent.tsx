@@ -6,6 +6,7 @@ import LinearProgress from '@material-ui/core/LinearProgress';
 import Tooltip from '@material-ui/core/Tooltip';
 import Typography from '@material-ui/core/Typography';
 import OpenInNewIcon from '@material-ui/icons/OpenInNew';
+import UndoIcon from '@material-ui/icons/Undo';
 import { makeStyles } from '@material-ui/core/styles';
 import { displayFont } from '../theme/themes';
 import CloudUploadIcon from '@material-ui/icons/CloudUpload';
@@ -30,7 +31,7 @@ import { type Deployment } from './joinDeployments';
 import { argoApplicationUrl, useArgocdUiUrl } from '../platformUi/argocd';
 import { useLiveDeployments } from './useLiveDeployments';
 import type { EnvironmentDetails } from './useEnvironmentDetails';
-import { phaseLabel, problemLabel, rolloutBar, rolloutLine } from './progressView';
+import { phaseLabel, problemLabel, rolloutBar, rolloutLine, timingTile } from './progressView';
 import { useComponentVersions, type ComponentVersions } from './useComponentVersions';
 import { whatChanged, type CommitRef } from './whatChanged';
 import { LogsDialog } from './LogsDialog';
@@ -112,7 +113,8 @@ const useStyles = makeStyles(theme => ({
   sha: { fontFamily: 'monospace', fontWeight: 600 },
   commitMessage: { fontWeight: 600 },
   muted: { color: theme.palette.text.secondary, fontSize: '0.8rem' },
-  compare: { marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: '0.8rem' },
+  changeActions: { marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: theme.spacing(2) },
+  compare: { display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: '0.8rem' },
   rolloutBar: { height: 6, borderRadius: 3, margin: theme.spacing(1, 0) },
   // Backstage's StatusRunning icon is static; spin it so an in-flight
   // rollout doesn't look frozen between polls.
@@ -198,12 +200,16 @@ const WhatChangedSection = ({
   progress,
   versions,
   previousKnown,
+  rollbackHref,
 }: {
   progress: Pick<EnvironmentDetails['progress'], 'targetVersion' | 'previous'>;
   versions: ComponentVersions;
   // False until the workload cluster has been read (or when it can't be):
   // then "no previous version" means "don't know", not "first deployment".
   previousKnown: boolean;
+  // Builds the Create deployment link for rolling back to `sha`; absent
+  // for viewers who can't deploy.
+  rollbackHref?: (sha: string) => string;
 }) => {
   const classes = useStyles();
   const change = whatChanged(progress, versions.versions, versions.repository);
@@ -230,11 +236,19 @@ const WhatChangedSection = ({
         <div className={classes.changeRow}>
           <Sha commit={target} />
           <span className={classes.commitMessage}>{target.message ?? 'Commit details unavailable'}</span>
-          {change.compareUrl && (
-            <Link to={change.compareUrl} className={classes.compare}>
-              Compare changes <OpenInNewIcon fontSize="inherit" />
-            </Link>
-          )}
+          <span className={classes.changeActions}>
+            {change.compareUrl && (
+              <Link to={change.compareUrl} className={classes.compare}>
+                Compare changes <OpenInNewIcon fontSize="inherit" />
+              </Link>
+            )}
+            {rollbackHref && previous && /^[0-9a-f]{40}$/.test(previous.sha) && (
+              // Opens Create deployment pre-filled; nothing ships until its PR merges.
+              <LinkButton to={rollbackHref(previous.sha)} size="small" variant="outlined" color="primary" startIcon={<UndoIcon />}>
+                Roll back to {previous.shortSha}
+              </LinkButton>
+            )}
+          </span>
         </div>
         <div className={classes.muted}>
           {[target.author, when && `committed ${when}`].filter(Boolean).join(' · ')}
@@ -292,6 +306,8 @@ const RolloutSection = ({
 
 const EnvironmentCard = ({
   deployment,
+  component,
+  canDeploy,
   versions,
   details,
   argocdUiUrl,
@@ -300,6 +316,8 @@ const EnvironmentCard = ({
   onViewLogs,
 }: {
   deployment: Deployment;
+  component: string;
+  canDeploy: boolean;
   versions: ComponentVersions;
   // This environment's summary (rollout progress); absent without a Release
   // or until it first loads, when the card falls back to Argo CD health.
@@ -316,6 +334,16 @@ const EnvironmentCard = ({
     namespace: deployment.argoApplicationNamespace,
   });
   const progress = details?.progress;
+  const timing = progress ? timingTile(progress) : null;
+  // A roll back keeps what the Release binds today (database, ...).
+  const bindings = Object.fromEntries(
+    (details?.bindings ?? [])
+      .filter(b => b.declaredByRelease && b.providerRef)
+      .map(b => [b.name, b.providerRef!.name]),
+  );
+  const rollbackHref = canDeploy
+    ? (version: string) => createDeploymentHref(component, { environment: deployment.environment, version, bindings })
+    : undefined;
 
   return (
     <PlatformEnvironmentCard
@@ -357,11 +385,16 @@ const EnvironmentCard = ({
           />
         </Grid>
         <Grid item xs={12} sm={6} md={3}>
-          <Tile
-            label="Last deployed"
-            value={timeAgo(deployment.lastDeployed) ?? '—'}
-            context={formatTimestamp(deployment.lastDeployed)}
-          />
+          {timing ? (
+            <Tile label={timing.label} value={timing.value} context={timing.context ?? undefined} />
+          ) : (
+            // Rollout state unknown: fall back to Argo CD's last sync.
+            <Tile
+              label="Last synced"
+              value={timeAgo(deployment.lastDeployed) ?? '—'}
+              context={formatTimestamp(deployment.lastDeployed)}
+            />
+          )}
         </Grid>
       </Grid>
 
@@ -369,6 +402,7 @@ const EnvironmentCard = ({
         progress={progress ?? { targetVersion: deployment.version, previous: null }}
         versions={versions}
         previousKnown={!!progress && progress.phase !== 'Unknown'}
+        rollbackHref={rollbackHref}
       />
 
       {details && progress && progress.phase !== 'Healthy' && progress.phase !== 'Unknown' && (
@@ -481,6 +515,8 @@ export const DeploymentsContent = () => {
         <Grid item xs={12} key={deployment.environment}>
           <EnvironmentCard
             deployment={deployment}
+            component={entity.metadata.name}
+            canDeploy={canDeploy}
             versions={versions}
             details={state.summaries[deployment.environment]}
             argocdUiUrl={argocdUiUrl}

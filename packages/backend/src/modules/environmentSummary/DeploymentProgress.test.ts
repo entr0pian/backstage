@@ -24,7 +24,13 @@ function rs(revision: number, version: string, counts: Partial<ReplicaSetSummary
   };
 }
 
-const settled: DeploymentRollout = { generation: 3, observedGeneration: 3, replicas: 3, deadlineExceeded: false };
+const settled: DeploymentRollout = {
+  generation: 3,
+  observedGeneration: 3,
+  replicas: 3,
+  deadlineExceeded: false,
+  completedAt: '2026-10-02T11:52:14Z',
+};
 
 function derive(overrides: {
   targetVersion?: string | null;
@@ -142,8 +148,8 @@ describe('deriveProgress', () => {
         rs(2, X, { desired: 1, current: 1 }),
       ],
       pods: [
-        { name: 'payments-rev2-abcde', replicaSet: 'payments-rev2', problem: { kind: 'ImagePull', reason: 'ImagePullBackOff' } },
-        { name: 'payments-rev1-fghij', replicaSet: 'payments-rev1', problem: null },
+        { name: 'payments-rev2-abcde', createdAt: null, replicaSet: 'payments-rev2', problem: { kind: 'ImagePull', reason: 'ImagePullBackOff' } },
+        { name: 'payments-rev1-fghij', createdAt: null, replicaSet: 'payments-rev1', problem: null },
       ],
     });
     expect(p).toMatchObject({
@@ -159,7 +165,7 @@ describe('deriveProgress', () => {
         rs(1, W, { desired: 1, current: 1 }),
         rs(2, X, { desired: 3, current: 3, ready: 3, available: 3 }),
       ],
-      pods: [{ name: 'payments-rev1-old', replicaSet: 'payments-rev1', problem: { kind: 'CrashLoop', reason: 'CrashLoopBackOff' } }],
+      pods: [{ name: 'payments-rev1-old', createdAt: null, replicaSet: 'payments-rev1', problem: { kind: 'CrashLoop', reason: 'CrashLoopBackOff' } }],
     });
     expect(p).toMatchObject({ phase: 'RollingOut', problems: [] });
   });
@@ -170,7 +176,7 @@ describe('deriveProgress', () => {
         rs(1, W, { desired: 3, current: 3, ready: 3, available: 3 }),
         rs(2, X, { desired: 1, current: 1 }),
       ],
-      pods: [{ name: 'payments-rev2-abcde', replicaSet: 'payments-rev2', problem: null }],
+      pods: [{ name: 'payments-rev2-abcde', createdAt: null, replicaSet: 'payments-rev2', problem: null }],
     });
     expect(p.phase).toBe('RollingOut');
   });
@@ -178,7 +184,7 @@ describe('deriveProgress', () => {
   it('surfaces an Other problem without calling the rollout Stalled', () => {
     const p = derive({
       replicaSets: [rs(1, W, { current: 3, ready: 3 }), rs(2, X, { desired: 1, current: 1 })],
-      pods: [{ name: 'p', replicaSet: 'payments-rev2', problem: { kind: 'Other', reason: 'CreateContainerConfigError' } }],
+      pods: [{ name: 'p', createdAt: null, replicaSet: 'payments-rev2', problem: { kind: 'Other', reason: 'CreateContainerConfigError' } }],
     });
     expect(p).toMatchObject({ phase: 'RollingOut', problems: [{ kind: 'Other' }] });
   });
@@ -187,7 +193,7 @@ describe('deriveProgress', () => {
     const p = derive({
       deployment: { ...settled, deadlineExceeded: true },
       replicaSets: [rs(1, W, { current: 3, ready: 3 }), rs(2, X, { desired: 1, current: 1 })],
-      pods: [{ name: 'p', replicaSet: 'payments-rev2', problem: { kind: 'CrashLoop', reason: 'CrashLoopBackOff' } }],
+      pods: [{ name: 'p', createdAt: null, replicaSet: 'payments-rev2', problem: { kind: 'CrashLoop', reason: 'CrashLoopBackOff' } }],
     });
     expect(p.phase).toBe('RolloutFailed');
   });
@@ -199,6 +205,40 @@ describe('deriveProgress', () => {
       replicaSets: [rs(1, W, { current: 3, ready: 3 }), rs(2, X, { desired: 1, current: 1 })],
     });
     expect(p).toMatchObject({ phase: 'Pending', previous: { version: X } });
+  });
+
+  it('times a finished rollout from its first target pod to the Deployment reporting it complete', () => {
+    const p = derive({
+      replicaSets: [
+        rs(1, W),
+        rs(2, X, { desired: 3, current: 3, ready: 3, available: 3, createdAt: '2026-10-02T11:52:10Z' }),
+      ],
+      pods: [
+        { name: 'b', createdAt: '2026-10-02T11:52:12Z', replicaSet: 'payments-rev2', problem: null },
+        { name: 'a', createdAt: '2026-10-02T11:52:10Z', replicaSet: 'payments-rev2', problem: null },
+        { name: 'old', createdAt: '2026-10-02T09:00:00Z', replicaSet: 'payments-rev1', problem: null },
+      ],
+    });
+    expect(p).toMatchObject({ phase: 'Healthy', startedAt: '2026-10-02T11:52:10Z', completedAt: '2026-10-02T11:52:14Z' });
+  });
+
+  it('starts a rollback rollout at its new pods, not at the reused ReplicaSet\'s old creation time', () => {
+    const p = derive({
+      targetVersion: W,
+      replicaSets: [
+        rs(3, W, { desired: 1, current: 1, ready: 1, available: 1, createdAt: '2026-09-01T00:00:00Z' }),
+        rs(2, X, { desired: 3, current: 3, ready: 3, available: 3 }),
+      ],
+      pods: [{ name: 'w1', createdAt: '2026-10-02T12:00:00Z', replicaSet: 'payments-rev3', problem: null }],
+    });
+    expect(p).toMatchObject({ phase: 'RollingOut', startedAt: '2026-10-02T12:00:00Z', completedAt: null });
+  });
+
+  it('falls back to the ReplicaSet creation time before any target pod exists', () => {
+    const p = derive({
+      replicaSets: [rs(1, W, { current: 3, ready: 3 }), rs(2, X, { desired: 1, createdAt: '2026-10-02T11:52:10Z' })],
+    });
+    expect(p).toMatchObject({ phase: 'RollingOut', startedAt: '2026-10-02T11:52:10Z' });
   });
 
   it('is Unknown when the workload cluster is unreachable', () => {

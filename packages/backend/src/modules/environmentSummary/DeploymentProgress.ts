@@ -28,10 +28,14 @@ export interface DeploymentRollout {
   observedGeneration: number | null;
   replicas: number; // spec.replicas: the desired count progress is measured against
   deadlineExceeded: boolean; // Progressing=False/ProgressDeadlineExceeded
+  // When the Deployment last reported its newest ReplicaSet fully available
+  // (Progressing=True/NewReplicaSetAvailable, lastUpdateTime).
+  completedAt: string | null;
 }
 
 export interface ProgressPod {
   name: string;
+  createdAt: string | null;
   replicaSet: string | null;
   problem: { kind: PodProblemKind; reason: string } | null;
 }
@@ -49,6 +53,12 @@ export interface DeploymentProgress {
   previous: { revision: number | null; version: string | null; current: number; ready: number } | null;
   // Problems of the target revision's pods only.
   problems: { pod: string; kind: PodProblemKind; reason: string }[];
+  // When the rollout to the target revision began: its earliest pod's
+  // creation (a rollback reuses an old ReplicaSet, whose own creation time
+  // can be weeks earlier), else the ReplicaSet's. Null until it exists.
+  startedAt: string | null;
+  // When it finished; only set once Healthy.
+  completedAt: string | null;
 }
 
 // Kinds that mean "this rollout won't make progress on its own". A pod that
@@ -68,7 +78,7 @@ export function deriveProgress(input: {
 }): DeploymentProgress {
   const { reachable, targetVersion, deployment } = input;
   const desiredReplicas = deployment?.replicas ?? 0;
-  const base = { targetVersion, desiredReplicas, target: null, previous: null, problems: [] };
+  const base = { targetVersion, desiredReplicas, target: null, previous: null, problems: [], startedAt: null, completedAt: null };
 
   if (!reachable || targetVersion === null) {
     return { ...base, phase: 'Unknown' };
@@ -86,14 +96,20 @@ export function deriveProgress(input: {
     return { ...base, phase: 'Pending', previous: asPrevious(newest) };
   }
 
-  const problems = input.pods
-    .filter(p => p.replicaSet === newest.name && p.problem)
+  const targetPods = input.pods.filter(p => p.replicaSet === newest.name);
+  const problems = targetPods
+    .filter(p => p.problem)
     .map(p => ({ pod: p.name, kind: p.problem!.kind, reason: p.problem!.reason }));
+  const earliestPod = targetPods
+    .map(p => p.createdAt)
+    .filter((t): t is string => !!t)
+    .sort()[0];
   const progress = {
     ...base,
     target: { revision: newest.revision, version: newest.version, ready: newest.ready, available: newest.available },
     previous: asPrevious(older[0]),
     problems,
+    startedAt: earliestPod ?? newest.createdAt,
   };
 
   if (deployment.deadlineExceeded) {
@@ -109,5 +125,7 @@ export function deriveProgress(input: {
     newest.ready < desiredReplicas ||
     newest.available < desiredReplicas ||
     older.some(rs => rs.current > 0);
-  return { ...progress, phase: rolling ? 'RollingOut' : 'Healthy' };
+  return rolling
+    ? { ...progress, phase: 'RollingOut' }
+    : { ...progress, phase: 'Healthy', completedAt: deployment.completedAt };
 }

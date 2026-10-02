@@ -14,6 +14,8 @@ export interface DeploymentProgress {
   target: { revision: number | null; version: string | null; ready: number; available: number } | null;
   previous: { revision: number | null; version: string | null; current: number; ready: number } | null;
   problems: { pod: string; kind: PodProblemKind; reason: string }[];
+  startedAt: string | null; // the rollout to the target revision began
+  completedAt: string | null; // ...and finished (set once Healthy)
 }
 
 // Mirrors the backend's EnvironmentSummary
@@ -54,6 +56,7 @@ export interface EnvironmentDetails {
       observedGeneration: number | null;
       replicas: number;
       deadlineExceeded: boolean;
+      completedAt: string | null;
     } | null;
     replicaSets: {
       name: string;

@@ -3,7 +3,7 @@
 // Kubernetes semantics are already decided server-side; nothing here looks
 // at Deployments or ReplicaSets.
 import type { DeploymentProgress, PodProblemKind, ProgressPhase } from './useEnvironmentDetails';
-import { shortVersion } from '../platformUi';
+import { shortVersion, timeAgo } from '../platformUi';
 
 // Fast while something is happening, slow otherwise. A healthy rollout of a
 // small service can finish between two fast polls (~4s, DEPLOYMENT_CARD_
@@ -86,4 +86,57 @@ export function rolloutBar(progress: DeploymentProgress): { available: number; r
   }
   const pct = (n: number) => Math.min(100, Math.round((n / desiredReplicas) * 100));
   return { available: pct(target.available), ready: pct(target.ready) };
+}
+
+// "45s", "1m 05s", "2h 03m".
+export function formatDuration(ms: number): string {
+  const total = Math.max(0, Math.round(ms / 1000));
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const sec = total % 60;
+  const pad = (n: number) => String(n).padStart(2, '0');
+  if (h > 0) return `${h}h ${pad(m)}m`;
+  if (m > 0) return `${m}m ${pad(sec)}s`;
+  return `${sec}s`;
+}
+
+export interface TimingTile {
+  label: string;
+  value: string;
+  context: string | null;
+}
+
+const ms = (iso: string) => new Date(iso).getTime();
+
+// The card's timing tile, from the rollout's own start/finish — not Argo
+// CD's last sync, which also moves on chart-only changes. Null when the
+// rollout state isn't known; the card then falls back to Argo CD.
+export function timingTile(progress: DeploymentProgress, now: number = Date.now()): TimingTile | null {
+  const { phase, startedAt, completedAt } = progress;
+  switch (phase) {
+    case 'Healthy': {
+      if (!completedAt) return null;
+      const took = startedAt && ms(startedAt) <= ms(completedAt) ? formatDuration(ms(completedAt) - ms(startedAt)) : null;
+      return { label: 'Rolled out', value: timeAgo(completedAt, now) ?? '—', context: took && `took ${took}` };
+    }
+    case 'RollingOut':
+    case 'Stalled':
+      // The counter is the whole story; a minute-rounded "started 1m ago"
+      // next to "for 40s" would only contradict it.
+      return {
+        label: 'Rolling out',
+        value: startedAt ? `for ${formatDuration(now - ms(startedAt))}` : 'starting',
+        context: null,
+      };
+    case 'RolloutFailed':
+      return {
+        label: 'Rollout',
+        value: 'failed',
+        context: startedAt ? `started ${timeAgo(startedAt, now)}` : null,
+      };
+    case 'Pending':
+      return { label: 'Rollout', value: 'waiting', context: 'for the cluster to receive it' };
+    default:
+      return null;
+  }
 }

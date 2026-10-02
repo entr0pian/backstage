@@ -96,6 +96,7 @@ export interface K8sCondition {
   status?: string;
   reason?: string;
   message?: string;
+  lastUpdateTime?: Timestamp;
 }
 
 export interface K8sExternalSecret {
@@ -325,6 +326,10 @@ function toDeploymentRollout(d: K8sDeployment): DeploymentRollout {
     observedGeneration: d.status?.observedGeneration ?? null,
     replicas: d.spec?.replicas ?? 0,
     deadlineExceeded: progressing?.status === 'False' && progressing.reason === 'ProgressDeadlineExceeded',
+    completedAt:
+      progressing?.status === 'True' && progressing.reason === 'NewReplicaSetAvailable'
+        ? iso(progressing.lastUpdateTime)
+        : null,
   };
 }
 
