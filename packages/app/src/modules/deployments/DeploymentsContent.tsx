@@ -1,12 +1,21 @@
 import { useState, type ReactNode } from 'react';
 import Box from '@material-ui/core/Box';
 import Button from '@material-ui/core/Button';
+import Divider from '@material-ui/core/Divider';
 import Grid from '@material-ui/core/Grid';
+import IconButton from '@material-ui/core/IconButton';
 import LinearProgress from '@material-ui/core/LinearProgress';
 import Tooltip from '@material-ui/core/Tooltip';
 import Typography from '@material-ui/core/Typography';
+import CallSplitIcon from '@material-ui/icons/CallSplit';
+import DescriptionIcon from '@material-ui/icons/DescriptionOutlined';
+import ExpandLessIcon from '@material-ui/icons/ExpandLess';
+import ExpandMoreIcon from '@material-ui/icons/ExpandMore';
 import OpenInNewIcon from '@material-ui/icons/OpenInNew';
+import ScheduleIcon from '@material-ui/icons/Schedule';
+import SyncIcon from '@material-ui/icons/Sync';
 import UndoIcon from '@material-ui/icons/Undo';
+import WidgetsIcon from '@material-ui/icons/WidgetsOutlined';
 import { makeStyles } from '@material-ui/core/styles';
 import { displayFont } from '../theme/themes';
 import CloudUploadIcon from '@material-ui/icons/CloudUpload';
@@ -16,11 +25,6 @@ import {
   LinkButton,
   Progress,
   ResponseErrorPanel,
-  StatusAborted,
-  StatusError,
-  StatusOK,
-  StatusPending,
-  StatusRunning,
   StatusWarning,
 } from '@backstage/core-components';
 import { taskCreatePermission } from '@backstage/plugin-scaffolder-common/alpha';
@@ -31,7 +35,8 @@ import { type Deployment } from './joinDeployments';
 import { argoApplicationUrl, useArgocdUiUrl } from '../platformUi/argocd';
 import { useLiveDeployments } from './useLiveDeployments';
 import type { EnvironmentDetails } from './useEnvironmentDetails';
-import { phaseLabel, problemLabel, rolloutBar, rolloutLine, timingTile } from './progressView';
+import { problemLabel, rolloutBar, rolloutLine, timingTile } from './progressView';
+import { PhaseStatus } from './PhaseStatus';
 import { useComponentVersions, type ComponentVersions } from './useComponentVersions';
 import { whatChanged, type CommitRef } from './whatChanged';
 import { LogsDialog } from './LogsDialog';
@@ -40,94 +45,60 @@ import {
   EnvironmentCard as PlatformEnvironmentCard,
   HealthStatus,
   PlatformEmptyState,
-  SyncStatus,
   shortVersion,
   timeAgo,
 } from '../platformUi';
 import { createDeploymentHref } from '../platformActions/createDeploymentHref';
 
-function formatTimestamp(value: string | null): string {
-  if (!value) {
-    return '—';
-  }
-  const date = new Date(value);
-  return Number.isNaN(date.getTime())
-    ? value
-    : date.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
-}
-
 const useStyles = makeStyles(theme => ({
-  // Same tile language as the Metrics tab: label, big value, context line.
-  tile: {
-    height: '100%',
-    padding: theme.spacing(2, 2, 1.5),
-    borderRadius: 14,
-    border: `1px solid ${theme.palette.divider}`,
-    backgroundColor: theme.palette.background.default,
+  // One row of icon + value + label stats, divided by thin rules.
+  stats: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))',
+    rowGap: theme.spacing(2),
+    padding: theme.spacing(0.5, 0, 2),
   },
-  label: {
-    color: theme.palette.text.secondary,
-    fontSize: '0.7rem',
-    fontWeight: 700,
-    letterSpacing: '0.08em',
-    textTransform: 'uppercase',
+  stat: {
+    display: 'flex',
+    alignItems: 'flex-start',
+    gap: theme.spacing(1.5),
+    padding: theme.spacing(0, 2),
+    '&:first-child': { paddingLeft: 0 },
+    '& + &': { borderLeft: `1px solid ${theme.palette.divider}` },
   },
-  value: {
+  statIcon: { color: theme.palette.text.secondary, marginTop: 2 },
+  statIconGood: { color: theme.palette.success.main, marginTop: 2 },
+  statValue: {
     fontFamily: displayFont,
-    fontSize: '1.3rem',
     fontWeight: 700,
-    lineHeight: 1.4,
-    marginTop: theme.spacing(0.5),
-    minHeight: 34,
-    display: 'flex',
-    alignItems: 'center',
-    '& .MuiTypography-root': { fontSize: 'inherit' },
-  },
-  mono: { fontFamily: 'monospace', fontSize: '1.15rem', fontWeight: 600 },
-  context: {
-    marginTop: theme.spacing(0.5),
-    fontSize: '0.75rem',
-    color: theme.palette.text.secondary,
+    fontSize: '1.05rem',
+    lineHeight: 1.3,
     whiteSpace: 'nowrap',
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
   },
-  section: {
-    color: theme.palette.text.secondary,
-    textTransform: 'uppercase',
-    letterSpacing: 0.6,
-    fontSize: '0.68rem',
-    fontWeight: 700,
-    margin: theme.spacing(3, 0, 1),
-  },
-  details: {
-    display: 'flex',
-    flexWrap: 'wrap',
-    gap: theme.spacing(1, 4),
-    fontSize: '0.85rem',
-  },
-  detailKey: { color: theme.palette.text.secondary, marginRight: theme.spacing(1) },
-  rolloutLine: { fontFamily: 'monospace', fontSize: '0.9rem' },
-  change: { display: 'flex', flexDirection: 'column', gap: theme.spacing(0.5), fontSize: '0.875rem' },
-  changeRow: { display: 'flex', alignItems: 'baseline', flexWrap: 'wrap', gap: theme.spacing(1) },
+  mono: { fontFamily: 'monospace', fontWeight: 700, fontSize: '1.05rem' },
+  statLabel: { color: theme.palette.text.secondary, fontSize: '0.8rem' },
+  sectionLabel: { color: theme.palette.text.secondary, fontSize: '0.8rem', margin: theme.spacing(2, 0, 0.75) },
+  change: { display: 'flex', alignItems: 'flex-start', gap: theme.spacing(1.5), flexWrap: 'wrap' },
+  changeText: { flex: '1 1 260px', minWidth: 0 },
+  commitMessage: { fontWeight: 700, fontSize: '0.95rem' },
   sha: { fontFamily: 'monospace', fontWeight: 600 },
-  commitMessage: { fontWeight: 600 },
   muted: { color: theme.palette.text.secondary, fontSize: '0.8rem' },
-  changeActions: { marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: theme.spacing(2) },
-  compare: { display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: '0.8rem' },
+  changeActions: { display: 'flex', gap: theme.spacing(1), flexWrap: 'wrap' },
+  rolloutLine: { fontFamily: 'monospace', fontSize: '0.9rem' },
   rolloutBar: { height: 6, borderRadius: 3, margin: theme.spacing(1, 0) },
-  // Backstage's StatusRunning icon is static; spin it so an in-flight
-  // rollout doesn't look frozen between polls.
-  '@keyframes spin': { from: { transform: 'rotate(0deg)' }, to: { transform: 'rotate(360deg)' } },
-  spinning: {
-    '& svg': { animation: '$spin 1.2s linear infinite' },
-    '@media (prefers-reduced-motion: reduce)': { '& svg': { animation: 'none' } },
-  },
   problem: {
     display: 'flex',
     alignItems: 'center',
     flexWrap: 'wrap',
     gap: theme.spacing(1),
+    fontSize: '0.85rem',
+  },
+  headerAction: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: theme.spacing(1),
+    padding: theme.spacing(2, 1, 0, 0),
+    color: theme.palette.text.secondary,
     fontSize: '0.85rem',
   },
   footer: {
@@ -140,47 +111,25 @@ const useStyles = makeStyles(theme => ({
   },
 }));
 
-const Tile = ({ label, value, context }: { label: string; value: ReactNode; context?: ReactNode }) => {
+const Stat = ({
+  icon,
+  value,
+  label,
+}: {
+  icon: ReactNode;
+  value: ReactNode;
+  label: ReactNode;
+}) => {
   const classes = useStyles();
   return (
-    <Box className={classes.tile}>
-      <Typography className={classes.label}>{label}</Typography>
-      <div className={classes.value}>{value}</div>
-      <div className={classes.context}>{context ?? '\u00a0'}</div>
-    </Box>
+    <div className={classes.stat}>
+      {icon}
+      <div>
+        <div className={classes.statValue}>{value}</div>
+        <div className={classes.statLabel}>{label}</div>
+      </div>
+    </div>
   );
-};
-
-function rolloutContext(details: EnvironmentDetails | undefined): string | undefined {
-  if (!details) return undefined;
-  if (!details.cluster.reachable) return 'Workload cluster unavailable';
-  const { target, desiredReplicas } = details.progress;
-  return target ? `${target.ready} / ${desiredReplicas} ready` : undefined;
-}
-
-// The rollout phase (backend DeploymentProgress) as a status indicator.
-// Unknown is grey, never red: an unreachable cluster isn't a failed deploy.
-const PhaseStatus = ({ details }: { details: EnvironmentDetails }) => {
-  const classes = useStyles();
-  const label = phaseLabel(details.progress, details.cluster.reachable);
-  switch (details.progress.phase) {
-    case 'Healthy':
-      return <StatusOK>{label}</StatusOK>;
-    case 'Pending':
-      return <StatusPending>{label}</StatusPending>;
-    case 'RollingOut':
-      return (
-        <span className={classes.spinning}>
-          <StatusRunning>{label}</StatusRunning>
-        </span>
-      );
-    case 'Stalled':
-      return <StatusWarning>{label}</StatusWarning>;
-    case 'RolloutFailed':
-      return <StatusError>{label}</StatusError>;
-    default:
-      return <StatusAborted>{label}</StatusAborted>;
-  }
 };
 
 const Sha = ({ commit }: { commit: CommitRef }) => {
@@ -218,42 +167,62 @@ const WhatChangedSection = ({
   }
   const { target, previous } = change;
   const when = timeAgo(target.createdAt);
-  let replaces: ReactNode = previousKnown ? 'First deployment to this environment' : null;
+  let replaces: ReactNode = previousKnown ? 'first deployment to this environment' : null;
   if (change.configurationOnly) {
-    replaces = 'Configuration change · same version, new revision';
+    replaces = 'configuration change, same version';
   } else if (previous) {
     replaces = (
       <>
-        Replaces <Sha commit={previous} />
-        {previous.message && ` ${previous.message}`}
+        previous <Sha commit={previous} />
       </>
     );
   }
+  const canRollBack = rollbackHref && previous && /^[0-9a-f]{40}$/.test(previous.sha);
   return (
     <>
-      <Typography className={classes.section}>What changed</Typography>
+      <Typography className={classes.sectionLabel}>What changed</Typography>
       <div className={classes.change}>
-        <div className={classes.changeRow}>
-          <Sha commit={target} />
-          <span className={classes.commitMessage}>{target.message ?? 'Commit details unavailable'}</span>
-          <span className={classes.changeActions}>
-            {change.compareUrl && (
-              <Link to={change.compareUrl} className={classes.compare}>
-                Compare changes <OpenInNewIcon fontSize="inherit" />
-              </Link>
-            )}
-            {rollbackHref && previous && /^[0-9a-f]{40}$/.test(previous.sha) && (
-              // Opens Create deployment pre-filled; nothing ships until its PR merges.
-              <LinkButton to={rollbackHref(previous.sha)} size="small" variant="outlined" color="primary" startIcon={<UndoIcon />}>
-                Roll back to {previous.shortSha}
-              </LinkButton>
-            )}
-          </span>
+        <CallSplitIcon className={classes.statIcon} />
+        <div className={classes.changeText}>
+          <div className={classes.commitMessage}>
+            {target.message ?? <Sha commit={target} />}
+          </div>
+          <div className={classes.muted}>
+            {[target.author, when].filter(Boolean).join(' · ')}
+            {(target.author || when) && replaces && ' · '}
+            {replaces}
+          </div>
         </div>
-        <div className={classes.muted}>
-          {[target.author, when && `committed ${when}`].filter(Boolean).join(' · ')}
-          {(target.author || when) && replaces && ' · '}
-          {replaces}
+        <div className={classes.changeActions}>
+          {change.compareUrl && (
+            <Button
+              size="small"
+              variant="outlined"
+              color="primary"
+              href={change.compareUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              endIcon={<OpenInNewIcon fontSize="small" />}
+            >
+              Compare changes
+            </Button>
+          )}
+          {canRollBack && (
+            // Opens Create deployment pre-filled and locked; nothing ships until its PR merges.
+            <Tooltip title={`Roll back to ${previous!.shortSha}`}>
+              <span>
+                <LinkButton
+                  to={rollbackHref!(previous!.sha)}
+                  size="small"
+                  variant="outlined"
+                  color="primary"
+                  startIcon={<UndoIcon />}
+                >
+                  Rollback
+                </LinkButton>
+              </span>
+            </Tooltip>
+          )}
         </div>
       </div>
     </>
@@ -276,7 +245,7 @@ const RolloutSection = ({
   const bar = rolloutBar(progress);
   return (
     <>
-      <Typography className={classes.section}>Rollout</Typography>
+      <Typography className={classes.sectionLabel}>Rollout</Typography>
       <Typography className={classes.rolloutLine}>{rolloutLine(progress)}</Typography>
       {bar && (
         // While rolling out, the buffer variant animates: solid = available,
@@ -328,6 +297,7 @@ const EnvironmentCard = ({
   onViewLogs: (podName?: string) => void;
 }) => {
   const classes = useStyles();
+  const [expanded, setExpanded] = useState(true);
   const pending = !deployment.argoApplicationName;
   const argoUrl = argoApplicationUrl(argocdUiUrl, {
     name: deployment.argoApplicationName,
@@ -345,115 +315,123 @@ const EnvironmentCard = ({
     ? (version: string) => createDeploymentHref(component, { environment: deployment.environment, version, bindings })
     : undefined;
 
+  // "Deployed 19m ago" in the header; while something is happening, what.
+  let headline: string | null = null;
+  if (timing?.label === 'Rolled out') headline = `Deployed ${timing.value}`;
+  else if (timing) headline = `${timing.label} ${timing.value}`;
+  else if (deployment.lastDeployed) headline = `Synced ${timeAgo(deployment.lastDeployed)}`;
+
+  let workloadValue: ReactNode = '—';
+  let workloadLabel: ReactNode = 'Workload';
+  if (details && !details.cluster.reachable) {
+    workloadLabel = 'Workload cluster unavailable';
+  } else if (progress?.target) {
+    workloadValue = `${progress.target.ready} / ${progress.desiredReplicas} ready`;
+  } else if (progress?.previous) {
+    workloadValue = `${progress.previous.ready} / ${progress.desiredReplicas} ready`;
+    workloadLabel = 'Workload · previous version';
+  }
+
+  const synced = deployment.syncStatus === 'Synced';
+
   return (
     <PlatformEnvironmentCard
       environment={deployment.environment}
+      status={
+        details ? <PhaseStatus details={details} /> : <HealthStatus status={deployment.healthStatus} pending={pending} />
+      }
       action={
-        <Box pt={2} pr={2}>
-          {details ? <PhaseStatus details={details} /> : <HealthStatus status={deployment.healthStatus} pending={pending} />}
-        </Box>
+        <div className={classes.headerAction}>
+          {headline && <span>{headline}</span>}
+          <IconButton
+            size="small"
+            aria-label={expanded ? 'Collapse' : 'Expand'}
+            aria-expanded={expanded}
+            onClick={() => setExpanded(e => !e)}
+          >
+            {expanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+          </IconButton>
+        </div>
       }
     >
-      <Grid container spacing={2} alignItems="stretch">
-        <Grid item xs={12} sm={6} md={3}>
-          <Tile
-            label="Version"
-            value={
-              deployment.version ? (
-                <Tooltip title={deployment.version}>
-                  <span className={classes.mono}>{shortVersion(deployment.version)}</span>
-                </Tooltip>
-              ) : (
-                '—'
-              )
-            }
-            context={deployment.releaseName ? `Release ${deployment.releaseName}` : 'No Release'}
-          />
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <Tile
-            label="Rollout"
-            value={details ? <PhaseStatus details={details} /> : '—'}
-            context={rolloutContext(details)}
-          />
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <Tile
-            label="Argo CD"
-            value={<SyncStatus status={deployment.syncStatus} pending={pending} />}
-            context={pending ? 'Application not found' : `Health: ${deployment.healthStatus}`}
-          />
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          {timing ? (
-            <Tile label={timing.label} value={timing.value} context={timing.context ?? undefined} />
-          ) : (
-            // Rollout state unknown: fall back to Argo CD's last sync.
-            <Tile
-              label="Last synced"
-              value={timeAgo(deployment.lastDeployed) ?? '—'}
-              context={formatTimestamp(deployment.lastDeployed)}
+      {expanded && (
+        <>
+          <div className={classes.stats}>
+            <Stat
+              icon={<CallSplitIcon className={classes.statIcon} />}
+              value={
+                deployment.version ? (
+                  <Tooltip title={deployment.version}>
+                    <span className={classes.mono}>{shortVersion(deployment.version)}</span>
+                  </Tooltip>
+                ) : (
+                  '—'
+                )
+              }
+              label="Version"
             />
+            <Stat icon={<WidgetsIcon className={classes.statIcon} />} value={workloadValue} label={workloadLabel} />
+            <Stat
+              icon={<SyncIcon className={synced ? classes.statIconGood : classes.statIcon} />}
+              value={pending ? 'Pending' : deployment.syncStatus}
+              label={pending ? 'Argo CD · application not found' : `Argo CD · ${deployment.healthStatus}`}
+            />
+            <Stat
+              icon={<ScheduleIcon className={classes.statIcon} />}
+              value={timing?.value ?? timeAgo(deployment.lastDeployed) ?? '—'}
+              label={timing ? [timing.label, timing.context].filter(Boolean).join(' · ') : 'Last synced'}
+            />
+          </div>
+          <Divider />
+
+          {details && progress && progress.phase !== 'Healthy' && progress.phase !== 'Unknown' && (
+            <RolloutSection details={details} logsAllowed={logsAllowed} onViewLogs={onViewLogs} />
           )}
-        </Grid>
-      </Grid>
 
-      <WhatChangedSection
-        progress={progress ?? { targetVersion: deployment.version, previous: null }}
-        versions={versions}
-        previousKnown={!!progress && progress.phase !== 'Unknown'}
-        rollbackHref={rollbackHref}
-      />
+          <WhatChangedSection
+            progress={progress ?? { targetVersion: deployment.version, previous: null }}
+            versions={versions}
+            previousKnown={!!progress && progress.phase !== 'Unknown'}
+            rollbackHref={rollbackHref}
+          />
 
-      {details && progress && progress.phase !== 'Healthy' && progress.phase !== 'Unknown' && (
-        <RolloutSection details={details} logsAllowed={logsAllowed} onViewLogs={onViewLogs} />
-      )}
-
-      <Typography className={classes.section}>Details</Typography>
-      <div className={classes.details}>
-        <span>
-          <span className={classes.detailKey}>Cluster</span>
-          {details?.cluster.name ?? '—'}
-        </span>
-        <span>
-          <span className={classes.detailKey}>Argo Application</span>
-          {deployment.argoApplicationName ?? '—'}
-        </span>
-      </div>
-
-      <div className={classes.footer}>
-        <Box display="flex" style={{ gap: 8 }}>
-          <Button size="small" color="primary" variant="outlined" disabled={pending} onClick={onViewDetails}>
-            Details
-          </Button>
-          <Tooltip title={logsAllowed ? '' : 'Sign in with GitHub to view logs'}>
-            {/* span: a disabled button emits no events, so Tooltip needs a wrapper */}
-            <span>
+          <div className={classes.footer}>
+            <Box display="flex" style={{ gap: 8 }}>
+              <Button size="small" color="primary" variant="outlined" disabled={pending} onClick={onViewDetails}>
+                View details
+              </Button>
+              <Tooltip title={logsAllowed ? '' : 'Sign in with GitHub to view logs'}>
+                {/* span: a disabled button emits no events, so Tooltip needs a wrapper */}
+                <span>
+                  <Button
+                    size="small"
+                    color="primary"
+                    variant="outlined"
+                    startIcon={<DescriptionIcon fontSize="small" />}
+                    disabled={pending || !logsAllowed}
+                    onClick={() => onViewLogs()}
+                  >
+                    Logs
+                  </Button>
+                </span>
+              </Tooltip>
+            </Box>
+            {argoUrl && (
               <Button
                 size="small"
                 color="primary"
                 variant="outlined"
-                disabled={pending || !logsAllowed}
-                onClick={() => onViewLogs()}
+                href={argoUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                endIcon={<OpenInNewIcon fontSize="small" />}
               >
-                Logs
+                Open in Argo CD
               </Button>
-            </span>
-          </Tooltip>
-        </Box>
-        {argoUrl && (
-          <Button
-            size="small"
-            color="primary"
-            href={argoUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            endIcon={<OpenInNewIcon fontSize="small" />}
-          >
-            Open in Argo CD
-          </Button>
-        )}
-      </div>
+            )}
+          </div>
+        </>
+      )}
     </PlatformEnvironmentCard>
   );
 };
@@ -531,6 +509,7 @@ export const DeploymentsContent = () => {
         deployment={
           state.deployments.find(d => d.environment === detailsEnvironment) ?? null
         }
+        live={detailsEnvironment ? state.summaries[detailsEnvironment] : undefined}
         argocdUiUrl={argocdUiUrl}
         logsAllowed={logsAllowed}
         onClose={() => setDetailsEnvironment(null)}

@@ -52,6 +52,8 @@ export interface EnvironmentDetails {
     runningImageTags: string[];
     imageMatchesRelease: boolean | null;
     deployment: {
+      name: string;
+      createdAt: string | null;
       generation: number | null;
       observedGeneration: number | null;
       replicas: number;
@@ -77,6 +79,7 @@ export interface EnvironmentDetails {
       ports: { name: string | null; port: number; protocol: string }[];
       readyEndpoints: number;
       notReadyEndpoints: number;
+      createdAt: string | null;
     }[];
   };
   bindings: {

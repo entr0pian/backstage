@@ -207,7 +207,8 @@ export interface EnvironmentSummary {
     runningImageTags: string[];
     // null when there is nothing to compare (no Release or no pods)
     imageMatchesRelease: boolean | null;
-    deployment: DeploymentRollout | null;
+    // Rollout fields plus what the Details drawer's resource table shows.
+    deployment: (DeploymentRollout & { name: string; createdAt: string | null }) | null;
     replicaSets: ReplicaSetSummary[]; // newest revision first, old ones kept at 0
   };
   networking: {
@@ -217,6 +218,7 @@ export interface EnvironmentSummary {
       ports: { name: string | null; port: number; protocol: string }[];
       readyEndpoints: number;
       notReadyEndpoints: number;
+      createdAt: string | null;
     }[];
   };
   bindings: BindingSummary[];
@@ -516,7 +518,10 @@ export function buildEnvironmentSummary(
         release && runningImageTags.length > 0
           ? runningImageTags.every(tag => tag === release.version)
           : null,
-      deployment: rollout,
+      deployment:
+        rollout && deployment
+          ? { ...rollout, name: deployment.metadata?.name ?? '', createdAt: iso(deployment.metadata?.creationTimestamp) }
+          : null,
       replicaSets,
     },
     networking: {
@@ -534,6 +539,7 @@ export function buildEnvironmentSummary(
               .map(p => ({ name: p.name ?? null, port: p.port!, protocol: p.protocol ?? 'TCP' })),
             readyEndpoints: ready,
             notReadyEndpoints: endpoints.length - ready,
+            createdAt: iso(s.metadata?.creationTimestamp),
           };
         }),
     },

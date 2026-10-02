@@ -131,8 +131,10 @@ describe('buildEnvironmentSummary', () => {
         ports: [{ name: 'http', port: 8080, protocol: 'TCP' }],
         readyEndpoints: 1,
         notReadyEndpoints: 0,
+        createdAt: null,
       },
     ]);
+    expect(s.workload.deployment).toMatchObject({ name: 'payments', replicas: 1, deadlineExceeded: false });
     expect(s.bindings).toEqual([
       {
         name: 'database',

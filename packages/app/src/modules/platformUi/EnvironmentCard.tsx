@@ -6,8 +6,8 @@ import { InfoCard } from '@backstage/core-components';
 import { accentGradient, environmentAccent, type EnvironmentAccent } from './environmentAccent';
 
 const useStyles = makeStyles(theme => ({
-  // A thin bar in the environment's colour along the top edge, brightening
-  // on hover (the lift itself comes from the theme's MuiCard hover).
+  // A thin bar in the environment's colour along the top edge. Static: these
+  // cards aren't links, so nothing moves on hover.
   card: {
     position: 'relative',
     '&::before': {
@@ -17,9 +17,7 @@ const useStyles = makeStyles(theme => ({
       height: 4,
       background: ({ accent }: { accent: EnvironmentAccent }) => accentGradient(accent, 90),
       opacity: 0.85,
-      transition: 'opacity 200ms ease, height 200ms ease',
     },
-    '&:hover::before': { opacity: 1, height: 5 },
   },
   title: { display: 'flex', alignItems: 'center', gap: theme.spacing(1.5) },
   badge: {
@@ -34,8 +32,6 @@ const useStyles = makeStyles(theme => ({
     textTransform: 'uppercase',
     background: ({ accent }: { accent: EnvironmentAccent }) => accentGradient(accent),
     boxShadow: ({ accent }: { accent: EnvironmentAccent }) => `0 6px 16px -6px ${accent.from}`,
-    transition: 'transform 250ms cubic-bezier(.34,1.56,.64,1)',
-    '$card:hover &': { transform: 'rotate(-8deg) scale(1.06)' },
   },
   name: {
     fontFamily: theme.typography.h1.fontFamily,
@@ -47,15 +43,17 @@ const useStyles = makeStyles(theme => ({
 }));
 
 // The card every per-environment tab uses: the environment's badge and name
-// as the title, and its colour along the top.
+// as the title (optionally followed by a status), and its colour along the top.
 export const EnvironmentCard = ({
   environment,
+  status,
   subheader,
   action,
   deepLink,
   children,
 }: {
   environment: string;
+  status?: ReactNode;
   subheader?: ReactNode;
   action?: ReactNode;
   deepLink?: { title: string; link: string };
@@ -73,6 +71,7 @@ export const EnvironmentCard = ({
           <Typography component="span" className={classes.name}>
             {environment}
           </Typography>
+          {status && <Box ml={1.5}>{status}</Box>}
         </Box>
       }
       subheader={subheader}
