@@ -64,16 +64,26 @@ export function rolloutLine(progress: DeploymentProgress): string {
     return `${from}${v(targetVersion)} · waiting for the cluster${serving}`;
   }
   const parts = [`${from}${v(target.version)}`, `${target.ready} / ${desiredReplicas} ready`];
+  // Ready but not yet available (minReadySeconds): Kubernetes won't replace
+  // the next old pod until these count, so say they're still starting.
+  const starting = target.ready - target.available;
+  if (starting > 0) {
+    parts.push(`${starting} starting`);
+  }
   if (previous && previous.current > 0) {
     parts.push(pods(previous.current));
   }
   return parts.join(' · ');
 }
 
-// 0–100 for a determinate progress bar; null when there's nothing to measure.
-export function rolloutPercent(progress: DeploymentProgress): number | null {
-  if (!progress.target || progress.desiredReplicas === 0) {
+// 0–100 for the rollout bar: `available` pods are done (solid), `ready` ones
+// include those still starting (the bar's moving buffer). Null when there's
+// nothing to measure.
+export function rolloutBar(progress: DeploymentProgress): { available: number; ready: number } | null {
+  const { target, desiredReplicas } = progress;
+  if (!target || desiredReplicas === 0) {
     return null;
   }
-  return Math.min(100, Math.round((progress.target.ready / progress.desiredReplicas) * 100));
+  const pct = (n: number) => Math.min(100, Math.round((n / desiredReplicas) * 100));
+  return { available: pct(target.available), ready: pct(target.ready) };
 }

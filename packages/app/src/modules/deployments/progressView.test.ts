@@ -5,7 +5,7 @@ import {
   pollInterval,
   problemLabel,
   rolloutLine,
-  rolloutPercent,
+  rolloutBar,
 } from './progressView';
 import type { DeploymentProgress } from './useEnvironmentDetails';
 
@@ -54,9 +54,18 @@ describe('progressView', () => {
   });
 
   it('measures the bar against the desired replicas', () => {
-    expect(rolloutPercent(progress({}))).toBe(67);
-    expect(rolloutPercent(progress({ target: null }))).toBeNull();
-    expect(rolloutPercent(progress({ desiredReplicas: 0 }))).toBeNull();
+    expect(rolloutBar(progress({}))).toEqual({ available: 67, ready: 67 });
+    expect(rolloutBar(progress({ target: { revision: 2, version: X, ready: 2, available: 1 } }))).toEqual({
+      available: 33,
+      ready: 67,
+    });
+    expect(rolloutBar(progress({ target: null }))).toBeNull();
+    expect(rolloutBar(progress({ desiredReplicas: 0 }))).toBeNull();
+  });
+
+  it('says when ready pods are still starting (minReadySeconds)', () => {
+    const p = progress({ target: { revision: 2, version: X, ready: 1, available: 0 }, previous: { revision: 1, version: W, current: 3, ready: 3 } });
+    expect(rolloutLine(p)).toBe('e692041 → dd9fc0e · 1 / 3 ready · 1 starting · 3 old pods serving');
   });
 
   it('labels an unreachable cluster as unavailable, not failed', () => {

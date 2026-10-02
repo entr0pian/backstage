@@ -29,7 +29,7 @@ import { type Deployment } from './joinDeployments';
 import { argoApplicationUrl, useArgocdUiUrl } from '../platformUi/argocd';
 import { useLiveDeployments } from './useLiveDeployments';
 import type { EnvironmentDetails } from './useEnvironmentDetails';
-import { phaseLabel, problemLabel, rolloutLine, rolloutPercent } from './progressView';
+import { phaseLabel, problemLabel, rolloutBar, rolloutLine } from './progressView';
 import { LogsDialog } from './LogsDialog';
 import { DetailsDrawer } from './DetailsDrawer';
 import {
@@ -111,6 +111,13 @@ const useStyles = makeStyles(theme => ({
   detailKey: { color: theme.palette.text.secondary, marginRight: theme.spacing(1) },
   rolloutLine: { fontFamily: 'monospace', fontSize: '0.9rem' },
   rolloutBar: { height: 6, borderRadius: 3, margin: theme.spacing(1, 0) },
+  // Backstage's StatusRunning icon is static; spin it so an in-flight
+  // rollout doesn't look frozen between polls.
+  '@keyframes spin': { from: { transform: 'rotate(0deg)' }, to: { transform: 'rotate(360deg)' } },
+  spinning: {
+    '& svg': { animation: '$spin 1.2s linear infinite' },
+    '@media (prefers-reduced-motion: reduce)': { '& svg': { animation: 'none' } },
+  },
   problem: {
     display: 'flex',
     alignItems: 'center',
@@ -149,6 +156,7 @@ function rolloutContext(details: EnvironmentDetails | undefined): string | undef
 // The rollout phase (backend DeploymentProgress) as a status indicator.
 // Unknown is grey, never red: an unreachable cluster isn't a failed deploy.
 const PhaseStatus = ({ details }: { details: EnvironmentDetails }) => {
+  const classes = useStyles();
   const label = phaseLabel(details.progress, details.cluster.reachable);
   switch (details.progress.phase) {
     case 'Healthy':
@@ -156,7 +164,11 @@ const PhaseStatus = ({ details }: { details: EnvironmentDetails }) => {
     case 'Pending':
       return <StatusPending>{label}</StatusPending>;
     case 'RollingOut':
-      return <StatusRunning>{label}</StatusRunning>;
+      return (
+        <span className={classes.spinning}>
+          <StatusRunning>{label}</StatusRunning>
+        </span>
+      );
     case 'Stalled':
       return <StatusWarning>{label}</StatusWarning>;
     case 'RolloutFailed':
@@ -179,16 +191,19 @@ const RolloutSection = ({
 }) => {
   const classes = useStyles();
   const { progress } = details;
-  const percent = rolloutPercent(progress);
+  const bar = rolloutBar(progress);
   return (
     <>
       <Typography className={classes.section}>Rollout</Typography>
       <Typography className={classes.rolloutLine}>{rolloutLine(progress)}</Typography>
-      {percent !== null && (
+      {bar && (
+        // While rolling out, the buffer variant animates: solid = available,
+        // light = ready but still starting, moving dots = still to come.
         <LinearProgress
           className={classes.rolloutBar}
-          variant="determinate"
-          value={percent}
+          variant={progress.phase === 'RollingOut' ? 'buffer' : 'determinate'}
+          value={bar.available}
+          valueBuffer={bar.ready}
           color={progress.phase === 'RollingOut' ? 'primary' : 'secondary'}
         />
       )}
