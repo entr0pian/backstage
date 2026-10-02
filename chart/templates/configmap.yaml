@@ -54,6 +54,9 @@ data:
     {{- $remoteClusters := include "backstage.remoteEnvironments" . }}
     {{- if or .Values.observability.prometheusUrl .Values.environments }}
     platform:
+      # The environment served by this cluster itself; any other must be a
+      # remote cluster below, or the Deployments tab reports it unreachable.
+      localEnvironment: {{ .Values.kubernetes.clusterName | quote }}
       {{- with .Values.observability.prometheusUrl }}
       # Metrics tab's fixed-query backend route (OBSERVABILLITY_PART4.md
       # Part 3): a cluster-internal Prometheus-compatible query API (Mimir,

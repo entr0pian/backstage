@@ -7,6 +7,18 @@
 // Grouped by what things mean to a developer (workload / networking /
 // bindings / warnings), not by Kubernetes kind. Never sees secret values:
 // the reader doesn't fetch Secrets, and nothing here reads secret data.
+//
+// Rollout progress (DeploymentProgress.ts) is derived here too, from the
+// same objects, so the frontend only renders it.
+
+import {
+  byRevisionDesc,
+  deriveProgress,
+  type DeploymentProgress,
+  type DeploymentRollout,
+  type PodProblemKind,
+  type ReplicaSetSummary,
+} from './DeploymentProgress';
 
 // --- input shapes (subsets of the Kubernetes objects actually read) -------
 
@@ -14,13 +26,28 @@ export interface K8sMeta {
   name?: string;
   namespace?: string;
   labels?: Record<string, string>;
+  annotations?: Record<string, string>;
   creationTimestamp?: string;
+  generation?: number;
+  ownerReferences?: { kind?: string; name?: string }[];
 }
 
 export interface K8sDeployment {
   metadata?: K8sMeta;
   spec?: { replicas?: number };
-  status?: { readyReplicas?: number; updatedReplicas?: number; availableReplicas?: number };
+  status?: {
+    observedGeneration?: number;
+    readyReplicas?: number;
+    updatedReplicas?: number;
+    availableReplicas?: number;
+    conditions?: K8sCondition[];
+  };
+}
+
+export interface K8sReplicaSet {
+  metadata?: K8sMeta;
+  spec?: { replicas?: number; template?: { spec?: { containers?: { image?: string }[] } } };
+  status?: { replicas?: number; readyReplicas?: number; availableReplicas?: number };
 }
 
 export interface K8sContainerState {
@@ -90,9 +117,13 @@ export interface ReleaseForSummary {
 }
 
 export interface EnvironmentObjects {
+  // The workload cluster the objects below were read from. reachable=false
+  // means they are empty because they couldn't be read, not because there
+  // are none.
+  cluster: { name: string | null; reachable: boolean };
   release: ReleaseForSummary | null;
   deployments: K8sDeployment[];
-  replicaSetNames: { namespace: string; name: string }[];
+  replicaSets: K8sReplicaSet[];
   pods: K8sPod[];
   services: K8sService[];
   // keyed by "<namespace>/<service name>"
@@ -111,8 +142,12 @@ export interface PodSummary {
   restarts: number;
   createdAt: string | null;
   images: string[];
-  // Why a pod isn't healthy, in the terms a developer searches for.
-  problem: { state: 'waiting' | 'terminated'; reason: string; exitCode?: number } | null;
+  // Owning ReplicaSet (owner reference), i.e. which revision the pod is.
+  replicaSet: string | null;
+  // Why a pod isn't healthy, in the terms a developer searches for. `kind`
+  // is the stable class; the raw reasons flap (ErrImagePull <->
+  // ImagePullBackOff, RunContainerError <-> CrashLoopBackOff).
+  problem: { kind: PodProblemKind; state: 'waiting' | 'terminated'; reason: string; exitCode?: number } | null;
 }
 
 export interface BindingSummary {
@@ -145,6 +180,8 @@ export interface EnvironmentSummary {
   component: string;
   environment: string;
   detailLevel: 'owner' | 'summary';
+  cluster: { name: string | null; reachable: boolean };
+  progress: DeploymentProgress;
   release: {
     name: string;
     namespace: string;
@@ -159,6 +196,8 @@ export interface EnvironmentSummary {
     runningImageTags: string[];
     // null when there is nothing to compare (no Release or no pods)
     imageMatchesRelease: boolean | null;
+    deployment: DeploymentRollout | null;
+    replicaSets: ReplicaSetSummary[]; // newest revision first, old ones kept at 0
   };
   networking: {
     services: {
@@ -192,20 +231,34 @@ export function imageTag(image: string): string {
   return lastColon > lastSlash ? withoutDigest.slice(lastColon + 1) : 'latest';
 }
 
+const PROBLEM_KINDS: Record<string, PodProblemKind> = {
+  ErrImagePull: 'ImagePull',
+  ImagePullBackOff: 'ImagePull',
+  InvalidImageName: 'ImagePull',
+  CrashLoopBackOff: 'CrashLoop',
+  RunContainerError: 'CrashLoop',
+};
+
+export function problemKind(reason: string): PodProblemKind {
+  return PROBLEM_KINDS[reason] ?? 'Other';
+}
+
 function podProblem(pod: K8sPod): PodSummary['problem'] {
   for (const status of pod.status?.containerStatuses ?? []) {
     const waiting = status.state?.waiting;
     if (waiting?.reason && waiting.reason !== 'ContainerCreating') {
+      const kind = problemKind(waiting.reason);
       const last = status.lastState?.terminated;
       // CrashLoopBackOff alone isn't actionable — surface why it crashed.
       if (last?.reason) {
-        return { state: 'terminated', reason: `${waiting.reason} (last exit: ${last.reason})`, exitCode: last.exitCode };
+        return { kind, state: 'terminated', reason: `${waiting.reason} (last exit: ${last.reason})`, exitCode: last.exitCode };
       }
-      return { state: 'waiting', reason: waiting.reason };
+      return { kind, state: 'waiting', reason: waiting.reason };
     }
     const terminated = status.state?.terminated;
     if (terminated?.reason && terminated.reason !== 'Completed') {
-      return { state: 'terminated', reason: terminated.reason, exitCode: terminated.exitCode };
+      // A Deployment's container that exited gets restarted: a crash loop.
+      return { kind: 'CrashLoop', state: 'terminated', reason: terminated.reason, exitCode: terminated.exitCode };
     }
   }
   return null;
@@ -229,7 +282,39 @@ function toPodSummary(pod: K8sPod): PodSummary | null {
     restarts: statuses.reduce((sum, s) => sum + (s.restartCount ?? 0), 0),
     createdAt: pod.metadata?.creationTimestamp ?? null,
     images,
+    replicaSet: pod.metadata?.ownerReferences?.find(o => o.kind === 'ReplicaSet')?.name ?? null,
     problem: podProblem(pod),
+  };
+}
+
+function toReplicaSetSummary(rs: K8sReplicaSet): ReplicaSetSummary | null {
+  const name = rs.metadata?.name;
+  const namespace = rs.metadata?.namespace;
+  if (!name || !namespace) {
+    return null;
+  }
+  const revision = Number(rs.metadata?.annotations?.['deployment.kubernetes.io/revision']);
+  const image = rs.spec?.template?.spec?.containers?.[0]?.image;
+  return {
+    name,
+    namespace,
+    revision: Number.isFinite(revision) ? revision : null,
+    version: image ? imageTag(image) : null,
+    desired: rs.spec?.replicas ?? 0,
+    current: rs.status?.replicas ?? 0,
+    ready: rs.status?.readyReplicas ?? 0,
+    available: rs.status?.availableReplicas ?? 0,
+    createdAt: rs.metadata?.creationTimestamp ?? null,
+  };
+}
+
+function toDeploymentRollout(d: K8sDeployment): DeploymentRollout {
+  const progressing = (d.status?.conditions ?? []).find(c => c.type === 'Progressing');
+  return {
+    generation: d.metadata?.generation ?? null,
+    observedGeneration: d.status?.observedGeneration ?? null,
+    replicas: d.spec?.replicas ?? 0,
+    deadlineExceeded: progressing?.status === 'False' && progressing.reason === 'ProgressDeadlineExceeded',
   };
 }
 
@@ -321,7 +406,7 @@ function buildWarnings(
     if (namespace && name) owned.add(`${kind}/${namespace}/${name}`);
   };
   objects.deployments.forEach(d => add('Deployment', d.metadata?.namespace, d.metadata?.name));
-  objects.replicaSetNames.forEach(r => add('ReplicaSet', r.namespace, r.name));
+  objects.replicaSets.forEach(r => add('ReplicaSet', r.metadata?.namespace, r.metadata?.name));
   objects.pods.forEach(p => add('Pod', p.metadata?.namespace, p.metadata?.name));
   objects.externalSecrets.forEach(e => add('ExternalSecret', e.metadata?.namespace, e.metadata?.name));
 
@@ -376,10 +461,28 @@ export function buildEnvironmentSummary(
   const runningImageTags = [...new Set(pods.flatMap(p => p.images).map(imageTag))].sort();
   const release = objects.release;
 
+  // The golang-service chart renders one Deployment per component; rollout
+  // state follows it and only the ReplicaSets it owns.
+  const deployment = objects.deployments[0];
+  const rollout = deployment ? toDeploymentRollout(deployment) : null;
+  const replicaSets = objects.replicaSets
+    .filter(rs => rs.metadata?.ownerReferences?.some(o => o.kind === 'Deployment' && o.name === deployment?.metadata?.name))
+    .map(toReplicaSetSummary)
+    .filter((r): r is ReplicaSetSummary => r !== null)
+    .sort(byRevisionDesc);
+
   return {
     component,
     environment,
     detailLevel: includeSensitive ? 'owner' : 'summary',
+    cluster: objects.cluster,
+    progress: deriveProgress({
+      reachable: objects.cluster.reachable,
+      targetVersion: release?.version || null,
+      deployment: rollout,
+      replicaSets,
+      pods,
+    }),
     release: release
       ? {
           name: release.name,
@@ -398,6 +501,8 @@ export function buildEnvironmentSummary(
         release && runningImageTags.length > 0
           ? runningImageTags.every(tag => tag === release.version)
           : null,
+      deployment: rollout,
+      replicaSets,
     },
     networking: {
       services: objects.services

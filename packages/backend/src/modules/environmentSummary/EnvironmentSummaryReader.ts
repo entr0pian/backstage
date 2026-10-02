@@ -15,6 +15,7 @@ import type {
   K8sEvent,
   K8sExternalSecret,
   K8sPod,
+  K8sReplicaSet,
   K8sService,
   ReleaseForSummary,
 } from './EnvironmentSummary';
@@ -28,7 +29,10 @@ import type {
 // backstage-reader.yaml). Read-only; never lists or gets Secrets.
 //
 // Each read degrades independently: a failed list is logged and contributes
-// nothing, so one missing permission or CRD can't blank the whole view.
+// nothing, so one missing permission or CRD can't blank the whole view. The
+// exception is the workload itself (Deployments, ReplicaSets, Pods): if those
+// can't be read, the cluster is reported unreachable, so "couldn't read" never
+// looks like "0 pods" (DEPLOYMENT_CARD_IMPLEMENTATION_PART1.md).
 export class EnvironmentSummaryReader {
   constructor(
     private readonly releases: ReleaseVersionReader,
@@ -47,8 +51,39 @@ export class EnvironmentSummaryReader {
     }
   }
 
+  // Like attempt(), but also reports whether the read succeeded.
+  private async required<T>(what: string, fn: () => Promise<T[]>): Promise<{ ok: boolean; items: T[] }> {
+    try {
+      return { ok: true, items: await fn() };
+    } catch (err) {
+      this.logger.warn(
+        `environment-summary: failed to read ${what} (${err instanceof Error ? err.message : String(err)})`,
+      );
+      return { ok: false, items: [] };
+    }
+  }
+
   async read(component: string, environment: string): Promise<EnvironmentObjects> {
-    const kubeConfig = await this.clusters.forEnvironment(environment);
+    // The Release lives on management whatever happens to the workload cluster.
+    const releasePromise = this.attempt('Release', null, async () => this.findRelease(component, environment));
+    const cluster = await this.attempt(`cluster for ${environment}`, null, async () =>
+      this.clusters.forEnvironment(environment),
+    );
+    if (!cluster) {
+      return {
+        cluster: { name: null, reachable: false },
+        release: await releasePromise,
+        deployments: [],
+        replicaSets: [],
+        pods: [],
+        services: [],
+        endpointSlices: {},
+        externalSecrets: [],
+        events: [],
+      };
+    }
+
+    const { kubeConfig } = cluster;
     const core = kubeConfig.makeApiClient(CoreV1Api);
     const apps = kubeConfig.makeApiClient(AppsV1Api);
     const discovery = kubeConfig.makeApiClient(DiscoveryV1Api);
@@ -56,17 +91,15 @@ export class EnvironmentSummaryReader {
 
     const labelSelector = `platform.taskapp.io/component=${component},platform.taskapp.io/environment=${environment}`;
 
-    const [release, deployments, replicaSets, pods, services, externalSecrets] = await Promise.all([
-      this.attempt('Release', null, async () => this.findRelease(component, environment)),
-      this.attempt('deployments', [] as K8sDeployment[], async () =>
+    const [release, deploymentsRead, replicaSetsRead, podsRead, services, externalSecrets] = await Promise.all([
+      releasePromise,
+      this.required('deployments', async () =>
         (await apps.listDeploymentForAllNamespaces({ labelSelector })).items as K8sDeployment[],
       ),
-      this.attempt('replicasets', [] as { namespace: string; name: string }[], async () =>
-        (await apps.listReplicaSetForAllNamespaces({ labelSelector })).items
-          .filter(rs => rs.metadata?.name && rs.metadata.namespace)
-          .map(rs => ({ namespace: rs.metadata!.namespace!, name: rs.metadata!.name! })),
+      this.required('replicasets', async () =>
+        (await apps.listReplicaSetForAllNamespaces({ labelSelector })).items as K8sReplicaSet[],
       ),
-      this.attempt('pods', [] as K8sPod[], async () =>
+      this.required('pods', async () =>
         (await core.listPodForAllNamespaces({ labelSelector })).items as K8sPod[],
       ),
       this.attempt('services', [] as K8sService[], async () =>
@@ -82,6 +115,10 @@ export class EnvironmentSummaryReader {
         return ((res as { items?: K8sExternalSecret[] }).items ?? []);
       }),
     ]);
+
+    const deployments = deploymentsRead.items;
+    const replicaSets = replicaSetsRead.items;
+    const pods = podsRead.items;
 
     const endpointSlices: Record<string, K8sEndpointSlice[]> = {};
     await Promise.all(
@@ -116,9 +153,10 @@ export class EnvironmentSummaryReader {
     ).flat();
 
     return {
+      cluster: { name: cluster.name, reachable: deploymentsRead.ok && replicaSetsRead.ok && podsRead.ok },
       release,
       deployments,
-      replicaSetNames: replicaSets,
+      replicaSets,
       pods,
       services,
       endpointSlices,

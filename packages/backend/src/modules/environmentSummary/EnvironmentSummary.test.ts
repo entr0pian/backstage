@@ -18,15 +18,37 @@ function paymentsObjects(overrides: Partial<EnvironmentObjects> = {}): Environme
     },
     deployments: [
       {
-        metadata: { name: 'payments', namespace: 'management' },
+        metadata: { name: 'payments', namespace: 'management', generation: 1 },
         spec: { replicas: 1 },
-        status: { readyReplicas: 1 },
+        status: {
+          observedGeneration: 1,
+          readyReplicas: 1,
+          availableReplicas: 1,
+          conditions: [{ type: 'Progressing', status: 'True', reason: 'NewReplicaSetAvailable' }],
+        },
       },
     ],
-    replicaSetNames: [{ namespace: 'management', name: 'payments-568c859586' }],
+    cluster: { name: 'management', reachable: true },
+    replicaSets: [
+      {
+        metadata: {
+          name: 'payments-568c859586',
+          namespace: 'management',
+          annotations: { 'deployment.kubernetes.io/revision': '1' },
+          ownerReferences: [{ kind: 'Deployment', name: 'payments' }],
+        },
+        spec: { replicas: 1, template: { spec: { containers: [{ image: `ghcr.io/entr0pian/payments:${SHA}` }] } } },
+        status: { replicas: 1, readyReplicas: 1, availableReplicas: 1 },
+      },
+    ],
     pods: [
       {
-        metadata: { name: 'payments-568c859586-49zbz', namespace: 'management', creationTimestamp: '2026-09-24T10:14:00Z' },
+        metadata: {
+          name: 'payments-568c859586-49zbz',
+          namespace: 'management',
+          creationTimestamp: '2026-09-24T10:14:00Z',
+          ownerReferences: [{ kind: 'ReplicaSet', name: 'payments-568c859586' }],
+        },
         spec: { containers: [{ name: 'payments', image: `ghcr.io/entr0pian/payments:${SHA}` }] },
         status: {
           phase: 'Running',
@@ -88,6 +110,12 @@ describe('buildEnvironmentSummary', () => {
     expect(s.workload.readyReplicas).toBe(1);
     expect(s.workload.pods[0]).toMatchObject({ ready: true, restarts: 0, problem: null });
     expect(s.workload.imageMatchesRelease).toBe(true);
+    expect(s.workload.pods[0].replicaSet).toBe('payments-568c859586');
+    expect(s.workload.replicaSets).toEqual([
+      expect.objectContaining({ name: 'payments-568c859586', revision: 1, version: SHA, desired: 1, ready: 1 }),
+    ]);
+    expect(s.cluster).toEqual({ name: 'management', reachable: true });
+    expect(s.progress).toMatchObject({ phase: 'Healthy', targetVersion: SHA, desiredReplicas: 1 });
     expect(s.networking.services).toEqual([
       {
         name: 'payments',
@@ -133,6 +161,7 @@ describe('buildEnvironmentSummary', () => {
     };
     const [pod] = buildEnvironmentSummary('payments', 'management', objects, { includeSensitive: false }).workload.pods;
     expect(pod.problem).toEqual({
+      kind: 'CrashLoop',
       state: 'terminated',
       reason: 'CrashLoopBackOff (last exit: OOMKilled)',
       exitCode: 137,
@@ -147,7 +176,7 @@ describe('buildEnvironmentSummary', () => {
       containerStatuses: [{ name: 'payments', ready: false, state: { waiting: { reason: 'ImagePullBackOff' } } }],
     };
     const s = buildEnvironmentSummary('payments', 'management', objects, { includeSensitive: false });
-    expect(s.workload.pods[0].problem).toEqual({ state: 'waiting', reason: 'ImagePullBackOff' });
+    expect(s.workload.pods[0].problem).toEqual({ kind: 'ImagePull', state: 'waiting', reason: 'ImagePullBackOff' });
     expect(s.workload.imageMatchesRelease).toBe(false);
   });
 
@@ -251,6 +280,35 @@ describe('buildEnvironmentSummary', () => {
     });
   });
 
+  it('reports an unreachable cluster as Unknown, not as zero pods rolling out', () => {
+    const objects = paymentsObjects({
+      cluster: { name: null, reachable: false },
+      deployments: [],
+      replicaSets: [],
+      pods: [],
+    });
+    const s = buildEnvironmentSummary('payments', 'management', objects, { includeSensitive: false });
+    expect(s.cluster.reachable).toBe(false);
+    expect(s.progress.phase).toBe('Unknown');
+  });
+
+  it('only counts ReplicaSets owned by the Deployment', () => {
+    const objects = paymentsObjects();
+    objects.replicaSets.push({
+      metadata: {
+        name: 'stray-abc',
+        namespace: 'management',
+        annotations: { 'deployment.kubernetes.io/revision': '9' },
+        ownerReferences: [{ kind: 'Deployment', name: 'something-else' }],
+      },
+      spec: { replicas: 1, template: { spec: { containers: [{ image: 'x:y' }] } } },
+      status: { replicas: 1 },
+    });
+    const s = buildEnvironmentSummary('payments', 'management', objects, { includeSensitive: false });
+    expect(s.workload.replicaSets.map(r => r.name)).toEqual(['payments-568c859586']);
+    expect(s.progress.phase).toBe('Healthy');
+  });
+
   it('handles an environment with a Release but nothing running yet', () => {
     const s = buildEnvironmentSummary(
       'payments',
@@ -263,8 +321,9 @@ describe('buildEnvironmentSummary', () => {
           bindings: {},
           ready: null,
         },
+        cluster: { name: 'dev', reachable: true },
         deployments: [],
-        replicaSetNames: [],
+        replicaSets: [],
         pods: [],
         services: [],
         endpointSlices: {},
@@ -279,7 +338,10 @@ describe('buildEnvironmentSummary', () => {
       pods: [],
       runningImageTags: [],
       imageMatchesRelease: null,
+      deployment: null,
+      replicaSets: [],
     });
+    expect(s.progress).toMatchObject({ phase: 'Pending', targetVersion: 'v1', previous: null });
     expect(s.release?.ready).toBeNull();
     expect(s.bindings).toEqual([]);
   });

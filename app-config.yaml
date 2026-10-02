@@ -248,6 +248,12 @@ kubernetes:
 # Settings for the platform's own frontend views (schema:
 # packages/app/config.d.ts).
 platform:
+  # The environment whose workloads run on the cluster Backstage itself runs
+  # on (read with its own ServiceAccount). Every other environment must be a
+  # registered remote cluster (platform.clustersDir) or reads as unreachable
+  # — never silently as this cluster. The deployed instance sets it from the
+  # chart's kubernetes.clusterName.
+  localEnvironment: management
   # Browser-reachable Argo CD UI for every "Open in Argo CD" link (Deployments
   # tab, Details drawer, Database page). Public, and visitors land in it
   # read-only without logging in (anonymous role:readonly, see
