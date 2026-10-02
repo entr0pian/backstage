@@ -302,8 +302,8 @@ const EnvironmentCard = ({
       <Typography className={classes.section}>Details</Typography>
       <div className={classes.details}>
         <span>
-          <span className={classes.detailKey}>Namespace</span>
-          {deployment.namespace ?? '—'}
+          <span className={classes.detailKey}>Cluster</span>
+          {details?.cluster.name ?? '—'}
         </span>
         <span>
           <span className={classes.detailKey}>Argo Application</span>
