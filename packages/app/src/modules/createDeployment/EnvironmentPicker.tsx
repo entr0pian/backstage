@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import FormControl from '@material-ui/core/FormControl';
 import FormHelperText from '@material-ui/core/FormHelperText';
 import InputLabel from '@material-ui/core/InputLabel';
@@ -9,6 +10,8 @@ import { accentGradient, environmentAccent } from '../platformUi/environmentAcce
 
 // Environments come from one list in app-config (platform.environments),
 // not an enum in the template — adding a cluster is a config change only.
+// Opened with one already chosen (a deployment card's Roll back), it stays
+// locked to it, like ComponentPicker.
 export const EnvironmentPicker = ({
   formData,
   onChange,
@@ -18,6 +21,8 @@ export const EnvironmentPicker = ({
 }: FieldExtensionComponentProps<string>) => {
   const environments =
     useApi(configApiRef).getOptionalStringArray('platform.environments') ?? [];
+  // Decided once, from what the form opened with.
+  const [locked] = useState(() => Boolean(formData));
 
   return (
     <FormControl
@@ -25,7 +30,7 @@ export const EnvironmentPicker = ({
       margin="normal"
       required={required}
       error={!!rawErrors?.length}
-      disabled={environments.length === 0}
+      disabled={locked || environments.length === 0}
     >
       <InputLabel id="environment-picker-label">{schema.title ?? 'Environment'}</InputLabel>
       <Select
@@ -52,7 +57,7 @@ export const EnvironmentPicker = ({
         ))}
       </Select>
       <FormHelperText>
-        {environments.length === 0
+        {environments.length === 0 && !locked
           ? 'No environments configured (platform.environments in app-config).'
           : schema.description}
       </FormHelperText>

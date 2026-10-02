@@ -58,6 +58,9 @@ export const VersionPicker = ({
   const discoveryApi = useApi(discoveryApiRef);
   const fetchApi = useApi(fetchApiRef);
   const component: string | undefined = formContext?.formData?.componentName;
+  // Opened with a version already chosen (a deployment card's Roll back): it
+  // stays locked to it, like ComponentPicker. Decided once, on open.
+  const [locked] = useState(() => Boolean(formData));
   const [state, setState] = useState<VersionsState>({ status: 'loading' });
 
   useEffect(() => {
@@ -105,16 +108,18 @@ export const VersionPicker = ({
       margin="normal"
       required={required}
       error={!!rawErrors?.length || state.status === 'error'}
-      disabled={versions.length === 0}
+      disabled={locked || versions.length === 0}
     >
       <InputLabel id="version-picker-label">{schema.title ?? 'Version'}</InputLabel>
       <Select
         labelId="version-picker-label"
-        value={versions.some(v => v.sha === formData) ? formData : ''}
+        value={locked || versions.some(v => v.sha === formData) ? formData ?? '' : ''}
         onChange={e => onChange(e.target.value as string)}
         renderValue={value => {
           const v = versions.find(x => x.sha === value);
-          return v ? `${v.shortSha} — ${v.message}` : '';
+          if (v) return `${v.shortSha} — ${v.message}`;
+          // Locked to a commit older than the list reaches: still show it.
+          return typeof value === 'string' ? value.slice(0, 7) : '';
         }}
       >
         {versions.map(v => (

@@ -41,6 +41,11 @@ export const DependencyBindingsPicker = ({
   const component: string | undefined = formContext?.formData?.componentName;
   const environment: string | undefined = formContext?.formData?.environment;
   const value = useMemo(() => formData ?? {}, [formData]);
+  // Opened as a roll back (the form arrived with a version already chosen —
+  // only a deployment card's Roll back does that): the bindings are the
+  // Release's current ones, shown but not editable. Not keyed on this
+  // field's own value: an object field can start as {} by default.
+  const [locked] = useState(() => Boolean(formContext?.formData?.version));
   const [state, setState] = useState<OptionsState>({ status: 'idle' });
 
   useEffect(() => {
@@ -123,6 +128,7 @@ export const DependencyBindingsPicker = ({
             <InputLabel id={id}>{options[0].label}</InputLabel>
             <Select
               labelId={id}
+              disabled={locked}
               value={value[type] ?? NONE}
               onChange={e => {
                 const { [type]: _removed, ...rest } = value;
