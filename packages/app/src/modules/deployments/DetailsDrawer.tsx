@@ -37,6 +37,7 @@ import { useEnvironmentDetails, type EnvironmentDetails } from './useEnvironment
 import { PhaseStatus } from './PhaseStatus';
 import { problemLabel } from './progressView';
 import { shortVersion, timeAgo } from '../platformUi';
+import { commitUrl } from './whatChanged';
 
 function age(since: string | null): string {
   if (!since) return '—';
@@ -141,6 +142,11 @@ const Panel = ({
   );
 };
 
+const VersionValue = ({ version, url }: { version: string; url: string | null }) => {
+  const label = <span style={{ fontFamily: 'monospace' }}>{shortVersion(version)}</span>;
+  return url ? <Link to={url}>{label}</Link> : label;
+};
+
 const Stat = ({ icon, value, label }: { icon: ReactNode; value: ReactNode; label: ReactNode }) => {
   const classes = useStyles();
   return (
@@ -179,7 +185,15 @@ const useDatabaseLink = () => {
     entityRoute({ namespace: 'default', kind: 'resource', name: `${ref.namespace}-${ref.name}` });
 };
 
-const SummaryPanel = ({ details, deployment }: { details: EnvironmentDetails; deployment: Deployment }) => {
+const SummaryPanel = ({
+  details,
+  deployment,
+  repository,
+}: {
+  details: EnvironmentDetails;
+  deployment: Deployment;
+  repository: string | null;
+}) => {
   const classes = useStyles();
   const { progress, workload, release } = details;
   const deployedAt = progress.completedAt;
@@ -199,7 +213,13 @@ const SummaryPanel = ({ details, deployment }: { details: EnvironmentDetails; de
       <div className={classes.summary}>
         <Stat
           icon={<CallSplitIcon className={classes.statIcon} />}
-          value={<span style={{ fontFamily: 'monospace' }}>{release ? shortVersion(release.version) : '—'}</span>}
+          value={
+            release ? (
+              <VersionValue version={release.version} url={commitUrl(repository, release.version)} />
+            ) : (
+              '—'
+            )
+          }
           label="Version"
         />
         <Stat
@@ -461,6 +481,7 @@ export const DetailsDrawer = ({
   component,
   deployment,
   live,
+  repository = null,
   argocdUiUrl,
   logsAllowed,
   onClose,
@@ -470,6 +491,8 @@ export const DetailsDrawer = ({
   deployment: Deployment | null;
   // The card's own (polled) summary: shown at once while the drawer loads its own.
   live?: EnvironmentDetails;
+  // The component's GitHub repository, for linking the version to its commit.
+  repository?: string | null;
   argocdUiUrl?: string;
   logsAllowed: boolean;
   onClose: () => void;
@@ -519,7 +542,7 @@ export const DetailsDrawer = ({
         {!details && state.status === 'error' && <ResponseErrorPanel error={state.error} />}
         {details && deployment && tab === 0 && (
           <>
-            <SummaryPanel details={details} deployment={deployment} />
+            <SummaryPanel details={details} deployment={deployment} repository={repository} />
             <ResourcesPanel details={details} argoUrl={argoUrl} logsAllowed={logsAllowed} onViewLogs={viewLogs} />
             <NetworkingPanel details={details} />
             <BindingsPanel details={details} />

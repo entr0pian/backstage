@@ -1,4 +1,4 @@
-import { missingShas, whatChanged, type DeployableVersion } from './whatChanged';
+import { commitUrl, missingShas, whatChanged, type DeployableVersion } from './whatChanged';
 
 const REPO = 'https://github.com/entr0pian/payments';
 const W = 'e692041c498a0d4ee4efad2563667d87af3d1fbc';
@@ -68,5 +68,14 @@ describe('missingShas', () => {
     const new1 = 'b'.repeat(40);
     expect(missingShas([X, new1, new1, null, 'latest', W], versions)).toEqual([new1]);
     expect(missingShas([X, W], versions)).toEqual([]);
+  });
+});
+
+describe('commitUrl', () => {
+  it('links a full SHA to its commit, and nothing else', () => {
+    expect(commitUrl(REPO, X)).toBe(`${REPO}/commit/${X}`);
+    expect(commitUrl(REPO, 'latest')).toBeNull();
+    expect(commitUrl(null, X)).toBeNull();
+    expect(commitUrl(REPO, null)).toBeNull();
   });
 });

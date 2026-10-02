@@ -34,12 +34,17 @@ export interface WhatChanged {
 
 const SHA = /^[0-9a-f]{40}$/;
 
+// The commit on GitHub for a full SHA; null for anything else (e.g. "latest").
+export function commitUrl(repository: string | null, sha: string | null | undefined): string | null {
+  return repository && sha && SHA.test(sha) ? `${repository}/commit/${sha}` : null;
+}
+
 function commitRef(sha: string, versions: DeployableVersion[], repository: string | null): CommitRef {
   const known = versions.find(v => v.sha === sha);
   return {
     sha,
     shortSha: SHA.test(sha) ? sha.slice(0, 7) : sha,
-    url: repository && SHA.test(sha) ? `${repository}/commit/${sha}` : null,
+    url: commitUrl(repository, sha),
     message: known?.message ?? null,
     author: known?.author ?? null,
     createdAt: known?.createdAt ?? null,

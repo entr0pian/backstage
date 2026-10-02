@@ -38,7 +38,7 @@ import type { EnvironmentDetails } from './useEnvironmentDetails';
 import { problemLabel, rolloutBar, rolloutLine, timingTile } from './progressView';
 import { PhaseStatus } from './PhaseStatus';
 import { useComponentVersions, type ComponentVersions } from './useComponentVersions';
-import { whatChanged, type CommitRef } from './whatChanged';
+import { commitUrl, whatChanged, type CommitRef } from './whatChanged';
 import { LogsDialog } from './LogsDialog';
 import { DetailsDrawer } from './DetailsDrawer';
 import {
@@ -110,6 +110,14 @@ const useStyles = makeStyles(theme => ({
     marginTop: theme.spacing(2),
   },
 }));
+
+// A version as its short SHA, linking to the commit on GitHub when it's one.
+const VersionLink = ({ version, repository }: { version: string; repository: string | null }) => {
+  const classes = useStyles();
+  const url = commitUrl(repository, version);
+  const label = <span className={classes.mono}>{shortVersion(version)}</span>;
+  return <Tooltip title={version}>{url ? <Link to={url}>{label}</Link> : label}</Tooltip>;
+};
 
 const Stat = ({
   icon,
@@ -361,9 +369,7 @@ const EnvironmentCard = ({
               icon={<CallSplitIcon className={classes.statIcon} />}
               value={
                 deployment.version ? (
-                  <Tooltip title={deployment.version}>
-                    <span className={classes.mono}>{shortVersion(deployment.version)}</span>
-                  </Tooltip>
+                  <VersionLink version={deployment.version} repository={versions.repository} />
                 ) : (
                   '—'
                 )
@@ -510,6 +516,7 @@ export const DeploymentsContent = () => {
           state.deployments.find(d => d.environment === detailsEnvironment) ?? null
         }
         live={detailsEnvironment ? state.summaries[detailsEnvironment] : undefined}
+        repository={versions.repository}
         argocdUiUrl={argocdUiUrl}
         logsAllowed={logsAllowed}
         onClose={() => setDetailsEnvironment(null)}
