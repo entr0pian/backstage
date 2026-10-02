@@ -22,12 +22,22 @@ import {
 
 // --- input shapes (subsets of the Kubernetes objects actually read) -------
 
+// @kubernetes/client-node deserializes typed objects' timestamps into Date
+// objects; custom objects (and test fixtures) carry the raw ISO string.
+// Everything leaving this module is an ISO string (iso()).
+export type Timestamp = string | Date;
+
+export function iso(t: Timestamp | undefined | null): string | null {
+  if (!t) return null;
+  return t instanceof Date ? t.toISOString() : t;
+}
+
 export interface K8sMeta {
   name?: string;
   namespace?: string;
   labels?: Record<string, string>;
   annotations?: Record<string, string>;
-  creationTimestamp?: string;
+  creationTimestamp?: Timestamp;
   generation?: number;
   ownerReferences?: { kind?: string; name?: string }[];
 }
@@ -102,9 +112,9 @@ export interface K8sEvent {
   reason?: string;
   message?: string;
   count?: number;
-  lastTimestamp?: string;
-  eventTime?: string;
-  series?: { count?: number; lastObservedTime?: string };
+  lastTimestamp?: Timestamp;
+  eventTime?: Timestamp;
+  series?: { count?: number; lastObservedTime?: Timestamp };
   involvedObject?: { kind?: string; name?: string; namespace?: string };
 }
 
@@ -280,7 +290,7 @@ function toPodSummary(pod: K8sPod): PodSummary | null {
     phase: pod.status?.phase ?? 'Unknown',
     ready: statuses.length > 0 && statuses.every(s => s.ready === true),
     restarts: statuses.reduce((sum, s) => sum + (s.restartCount ?? 0), 0),
-    createdAt: pod.metadata?.creationTimestamp ?? null,
+    createdAt: iso(pod.metadata?.creationTimestamp),
     images,
     replicaSet: pod.metadata?.ownerReferences?.find(o => o.kind === 'ReplicaSet')?.name ?? null,
     problem: podProblem(pod),
@@ -304,7 +314,7 @@ function toReplicaSetSummary(rs: K8sReplicaSet): ReplicaSetSummary | null {
     current: rs.status?.replicas ?? 0,
     ready: rs.status?.readyReplicas ?? 0,
     available: rs.status?.availableReplicas ?? 0,
-    createdAt: rs.metadata?.creationTimestamp ?? null,
+    createdAt: iso(rs.metadata?.creationTimestamp),
   };
 }
 
@@ -392,7 +402,7 @@ function buildBindings(
 }
 
 function eventTime(e: K8sEvent): string | null {
-  return e.series?.lastObservedTime ?? e.lastTimestamp ?? e.eventTime ?? null;
+  return iso(e.series?.lastObservedTime ?? e.lastTimestamp ?? e.eventTime);
 }
 
 function buildWarnings(

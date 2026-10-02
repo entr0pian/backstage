@@ -280,6 +280,31 @@ describe('buildEnvironmentSummary', () => {
     });
   });
 
+  it('accepts the Date timestamps @kubernetes/client-node returns, with several pods and events', () => {
+    const objects = paymentsObjects();
+    const [pod] = objects.pods;
+    objects.pods = ['a', 'b', 'c'].map((suffix, i) => ({
+      ...pod,
+      metadata: { ...pod.metadata, name: `payments-568c859586-${suffix}`, creationTimestamp: new Date(Date.UTC(2026, 8, 24, 10, i)) },
+    }));
+    objects.events = [1, 2].map(minute => ({
+      type: 'Warning',
+      reason: 'Unhealthy',
+      count: 1,
+      lastTimestamp: new Date(Date.UTC(2026, 8, 24, 10, 50 + minute)),
+      involvedObject: { kind: 'Pod', name: 'payments-568c859586-a', namespace: 'management' },
+    }));
+    const s = buildEnvironmentSummary('payments', 'management', objects, { includeSensitive: false, now: NOW });
+    expect(s.workload.pods.map(p => p.createdAt)).toEqual([
+      '2026-09-24T10:02:00.000Z',
+      '2026-09-24T10:01:00.000Z',
+      '2026-09-24T10:00:00.000Z',
+    ]);
+    expect(s.warnings).toEqual([
+      expect.objectContaining({ reason: 'Unhealthy', count: 2, lastSeen: '2026-09-24T10:52:00.000Z' }),
+    ]);
+  });
+
   it('reports an unreachable cluster as Unknown, not as zero pods rolling out', () => {
     const objects = paymentsObjects({
       cluster: { name: null, reachable: false },
