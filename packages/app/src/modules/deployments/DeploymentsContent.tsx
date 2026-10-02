@@ -11,6 +11,7 @@ import { displayFont } from '../theme/themes';
 import CloudUploadIcon from '@material-ui/icons/CloudUpload';
 import RocketIcon from '@material-ui/icons/FlightTakeoff';
 import {
+  Link,
   LinkButton,
   Progress,
   ResponseErrorPanel,
@@ -30,6 +31,8 @@ import { argoApplicationUrl, useArgocdUiUrl } from '../platformUi/argocd';
 import { useLiveDeployments } from './useLiveDeployments';
 import type { EnvironmentDetails } from './useEnvironmentDetails';
 import { phaseLabel, problemLabel, rolloutBar, rolloutLine } from './progressView';
+import { useComponentVersions, type ComponentVersions } from './useComponentVersions';
+import { whatChanged, type CommitRef } from './whatChanged';
 import { LogsDialog } from './LogsDialog';
 import { DetailsDrawer } from './DetailsDrawer';
 import {
@@ -104,6 +107,12 @@ const useStyles = makeStyles(theme => ({
   },
   detailKey: { color: theme.palette.text.secondary, marginRight: theme.spacing(1) },
   rolloutLine: { fontFamily: 'monospace', fontSize: '0.9rem' },
+  change: { display: 'flex', flexDirection: 'column', gap: theme.spacing(0.5), fontSize: '0.875rem' },
+  changeRow: { display: 'flex', alignItems: 'baseline', flexWrap: 'wrap', gap: theme.spacing(1) },
+  sha: { fontFamily: 'monospace', fontWeight: 600 },
+  commitMessage: { fontWeight: 600 },
+  muted: { color: theme.palette.text.secondary, fontSize: '0.8rem' },
+  compare: { marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: '0.8rem' },
   rolloutBar: { height: 6, borderRadius: 3, margin: theme.spacing(1, 0) },
   // Backstage's StatusRunning icon is static; spin it so an in-flight
   // rollout doesn't look frozen between polls.
@@ -172,6 +181,71 @@ const PhaseStatus = ({ details }: { details: EnvironmentDetails }) => {
   }
 };
 
+const Sha = ({ commit }: { commit: CommitRef }) => {
+  const classes = useStyles();
+  return commit.url ? (
+    <Link to={commit.url} className={classes.sha}>
+      {commit.shortSha}
+    </Link>
+  ) : (
+    <span className={classes.sha}>{commit.shortSha}</span>
+  );
+};
+
+// What the environment's current deployment changed: the target commit,
+// the version it replaced, and a GitHub compare between them (whatChanged.ts).
+const WhatChangedSection = ({
+  progress,
+  versions,
+  previousKnown,
+}: {
+  progress: Pick<EnvironmentDetails['progress'], 'targetVersion' | 'previous'>;
+  versions: ComponentVersions;
+  // False until the workload cluster has been read (or when it can't be):
+  // then "no previous version" means "don't know", not "first deployment".
+  previousKnown: boolean;
+}) => {
+  const classes = useStyles();
+  const change = whatChanged(progress, versions.versions, versions.repository);
+  if (!change) {
+    return null;
+  }
+  const { target, previous } = change;
+  const when = timeAgo(target.createdAt);
+  let replaces: ReactNode = previousKnown ? 'First deployment to this environment' : null;
+  if (change.configurationOnly) {
+    replaces = 'Configuration change · same version, new revision';
+  } else if (previous) {
+    replaces = (
+      <>
+        Replaces <Sha commit={previous} />
+        {previous.message && ` ${previous.message}`}
+      </>
+    );
+  }
+  return (
+    <>
+      <Typography className={classes.section}>What changed</Typography>
+      <div className={classes.change}>
+        <div className={classes.changeRow}>
+          <Sha commit={target} />
+          <span className={classes.commitMessage}>{target.message ?? 'Commit details unavailable'}</span>
+          {change.compareUrl && (
+            <Link to={change.compareUrl} className={classes.compare}>
+              Compare changes <OpenInNewIcon fontSize="inherit" />
+            </Link>
+          )}
+        </div>
+        <div className={classes.muted}>
+          {[target.author, when && `committed ${when}`].filter(Boolean).join(' · ')}
+          {(target.author || when) && replaces && ' · '}
+          {replaces}
+        </div>
+      </div>
+    </>
+  );
+};
+
 // Shown while a deployment is in flight or has failed: where it is, what's
 // still serving, and what's wrong with the new pods. Healthy stays compact.
 const RolloutSection = ({
@@ -218,6 +292,7 @@ const RolloutSection = ({
 
 const EnvironmentCard = ({
   deployment,
+  versions,
   details,
   argocdUiUrl,
   logsAllowed,
@@ -225,6 +300,7 @@ const EnvironmentCard = ({
   onViewLogs,
 }: {
   deployment: Deployment;
+  versions: ComponentVersions;
   // This environment's summary (rollout progress); absent without a Release
   // or until it first loads, when the card falls back to Argo CD health.
   details?: EnvironmentDetails;
@@ -289,6 +365,12 @@ const EnvironmentCard = ({
         </Grid>
       </Grid>
 
+      <WhatChangedSection
+        progress={progress ?? { targetVersion: deployment.version, previous: null }}
+        versions={versions}
+        previousKnown={!!progress && progress.phase !== 'Unknown'}
+      />
+
       {details && progress && progress.phase !== 'Healthy' && progress.phase !== 'Unknown' && (
         <RolloutSection details={details} logsAllowed={logsAllowed} onViewLogs={onViewLogs} />
       )}
@@ -352,6 +434,12 @@ export const DeploymentsContent = () => {
   const { entity } = useEntity();
   const argocdUiUrl = useArgocdUiUrl();
   const state = useLiveDeployments(entity.metadata.name);
+  // Every SHA the cards show (each environment's target and previous), so
+  // the versions list is refetched when a new deploy isn't in it yet.
+  const versions = useComponentVersions(
+    entity.metadata.name,
+    Object.values(state.summaries).flatMap(s => [s.progress.targetVersion, s.progress.previous?.version]),
+  );
   const [detailsEnvironment, setDetailsEnvironment] = useState<string | null>(null);
   const [logs, setLogs] = useState<{ environment: string; podName?: string } | null>(null);
   // Owner-only by permission policy (the Kubernetes plugin's permissions are
@@ -393,6 +481,7 @@ export const DeploymentsContent = () => {
         <Grid item xs={12} key={deployment.environment}>
           <EnvironmentCard
             deployment={deployment}
+            versions={versions}
             details={state.summaries[deployment.environment]}
             argocdUiUrl={argocdUiUrl}
             logsAllowed={logsAllowed}
