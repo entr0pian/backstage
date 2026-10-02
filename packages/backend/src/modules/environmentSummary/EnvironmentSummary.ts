@@ -19,6 +19,7 @@ import {
   type PodProblemKind,
   type ReplicaSetSummary,
 } from './DeploymentProgress';
+import { buildRolloutSteps, type RolloutStep } from './RolloutEvents';
 
 // --- input shapes (subsets of the Kubernetes objects actually read) -------
 
@@ -223,6 +224,9 @@ export interface EnvironmentSummary {
   };
   bindings: BindingSummary[];
   warnings: WarningSummary[];
+  // The current rollout's last steps, oldest first (RolloutEvents.ts); empty
+  // until Kubernetes has the target revision, and once its events expire (~1h).
+  rolloutSteps: RolloutStep[];
 }
 
 // --- logic ----------------------------------------------------------------
@@ -488,18 +492,30 @@ export function buildEnvironmentSummary(
     .filter((r): r is ReplicaSetSummary => r !== null)
     .sort(byRevisionDesc);
 
+  const progress = deriveProgress({
+    reachable: objects.cluster.reachable,
+    targetVersion: release?.version || null,
+    deployment: rollout,
+    replicaSets,
+    pods,
+  });
+  const rolloutSteps = progress.target
+    ? buildRolloutSteps({
+        events: objects.events.map(e => ({ ...e, at: eventTime(e) })),
+        deploymentName: deployment?.metadata?.name ?? null,
+        replicaSets,
+        targetPodNames: pods.filter(p => p.replicaSet === replicaSets[0]?.name).map(p => p.name),
+        startedAt: progress.startedAt,
+        includeSensitive,
+      })
+    : [];
+
   return {
     component,
     environment,
     detailLevel: includeSensitive ? 'owner' : 'summary',
     cluster: objects.cluster,
-    progress: deriveProgress({
-      reachable: objects.cluster.reachable,
-      targetVersion: release?.version || null,
-      deployment: rollout,
-      replicaSets,
-      pods,
-    }),
+    progress,
     release: release
       ? {
           name: release.name,
@@ -545,5 +561,6 @@ export function buildEnvironmentSummary(
     },
     bindings: buildBindings(release, objects.externalSecrets, includeSensitive),
     warnings: buildWarnings(objects, now, includeSensitive),
+    rolloutSteps,
   };
 }

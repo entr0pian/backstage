@@ -106,6 +106,17 @@ export interface EnvironmentDetails {
     lastSeen: string | null;
     message?: string;
   }[];
+  // The current rollout's last steps, oldest first (backend RolloutEvents.ts).
+  rolloutSteps: {
+    at: string;
+    type: 'Normal' | 'Warning';
+    reason: string;
+    objectKind: string;
+    objectName: string;
+    summary: string;
+    count: number;
+    message?: string; // owner only
+  }[];
 }
 
 export type EnvironmentDetailsState =

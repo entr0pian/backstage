@@ -137,7 +137,8 @@ export class EnvironmentSummaryReader {
         }),
     );
 
-    // Warning events live in the namespaces this component's objects are in.
+    // Events live in the namespaces this component's objects are in. All
+    // types: warnings for the warnings list, normal ones for rollout steps.
     const namespaces = new Set<string>();
     [...deployments, ...pods, ...externalSecrets].forEach(o => {
       if (o.metadata?.namespace) namespaces.add(o.metadata.namespace);
@@ -146,7 +147,7 @@ export class EnvironmentSummaryReader {
       await Promise.all(
         [...namespaces].map(namespace =>
           this.attempt(`events in ${namespace}`, [] as K8sEvent[], async () =>
-            (await core.listNamespacedEvent({ namespace, fieldSelector: 'type=Warning' })).items as K8sEvent[],
+            (await core.listNamespacedEvent({ namespace })).items as K8sEvent[],
           ),
         ),
       )

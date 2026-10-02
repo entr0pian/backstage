@@ -38,6 +38,7 @@ import type { EnvironmentDetails } from './useEnvironmentDetails';
 import { cardActivity, isActive, problemLabel, rolloutBar, rolloutLine, timingTile } from './progressView';
 import type { ProgressPhase } from './useEnvironmentDetails';
 import { PhaseStatus } from './PhaseStatus';
+import { RolloutSteps } from './RolloutSteps';
 import { useComponentVersions, type ComponentVersions } from './useComponentVersions';
 import { commitUrl, whatChanged, type CommitRef } from './whatChanged';
 import { LogsDialog } from './LogsDialog';
@@ -294,6 +295,12 @@ const RolloutSection = ({
           )}
         </div>
       ))}
+      {details.rolloutSteps.length > 0 && (
+        <>
+          <Typography className={classes.sectionLabel}>Latest steps</Typography>
+          <RolloutSteps steps={details.rolloutSteps} limit={5} />
+        </>
+      )}
     </>
   );
 };

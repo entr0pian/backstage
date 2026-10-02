@@ -35,6 +35,7 @@ import { type Deployment } from './joinDeployments';
 import { argoApplicationUrl } from '../platformUi/argocd';
 import { useEnvironmentDetails, type EnvironmentDetails } from './useEnvironmentDetails';
 import { PhaseStatus } from './PhaseStatus';
+import { RolloutSteps } from './RolloutSteps';
 import { problemLabel } from './progressView';
 import { shortVersion, timeAgo } from '../platformUi';
 import { commitUrl } from './whatChanged';
@@ -548,6 +549,19 @@ export const DetailsDrawer = ({
             <BindingsPanel details={details} />
             <EventsPanel details={details} onShowAll={() => setTab(1)} />
           </>
+        )}
+        {details && tab === 1 && (
+          <Panel icon={<TimelineIcon className={classes.panelIcon} />} title="Last rollout">
+            {details.rolloutSteps.length === 0 ? (
+              <Typography className={classes.line}>
+                <span className={classes.muted}>
+                  No rollout steps to show — Kubernetes keeps events for about an hour.
+                </span>
+              </Typography>
+            ) : (
+              <RolloutSteps steps={details.rolloutSteps} />
+            )}
+          </Panel>
         )}
         {details && tab === 1 && (
           <Panel icon={<TimelineIcon className={classes.panelIcon} />} title="Warnings (last hour)">
