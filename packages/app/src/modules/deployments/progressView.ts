@@ -140,3 +140,24 @@ export function timingTile(progress: DeploymentProgress, now: number = Date.now(
       return null;
   }
 }
+
+// How an environment's card draws attention to it (platformUi EnvironmentCard):
+// moving while a deployment is in flight, slower and amber when it's stuck,
+// a still red frame when it failed, one green glow when it has just finished.
+export type CardActivity = 'active' | 'attention' | 'failed' | 'completed';
+
+export function cardActivity(phase: ProgressPhase, justFinished: boolean): CardActivity | undefined {
+  switch (phase) {
+    case 'Pending':
+    case 'RollingOut':
+      return 'active';
+    case 'Stalled':
+      return 'attention';
+    case 'RolloutFailed':
+      return 'failed';
+    case 'Healthy':
+      return justFinished ? 'completed' : undefined;
+    default:
+      return undefined;
+  }
+}

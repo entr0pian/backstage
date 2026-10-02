@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import Box from '@material-ui/core/Box';
 import Button from '@material-ui/core/Button';
 import Divider from '@material-ui/core/Divider';
@@ -35,7 +35,8 @@ import { type Deployment } from './joinDeployments';
 import { argoApplicationUrl, useArgocdUiUrl } from '../platformUi/argocd';
 import { useLiveDeployments } from './useLiveDeployments';
 import type { EnvironmentDetails } from './useEnvironmentDetails';
-import { problemLabel, rolloutBar, rolloutLine, timingTile } from './progressView';
+import { cardActivity, isActive, problemLabel, rolloutBar, rolloutLine, timingTile } from './progressView';
+import type { ProgressPhase } from './useEnvironmentDetails';
 import { PhaseStatus } from './PhaseStatus';
 import { useComponentVersions, type ComponentVersions } from './useComponentVersions';
 import { commitUrl, whatChanged, type CommitRef } from './whatChanged';
@@ -110,6 +111,22 @@ const useStyles = makeStyles(theme => ({
     marginTop: theme.spacing(2),
   },
 }));
+
+// True for a moment after a rollout this page watched turns Healthy — not
+// on page load, so an environment that was already healthy doesn't glow.
+function useJustFinished(phase: ProgressPhase | undefined, durationMs = 2000): boolean {
+  const previous = useRef<ProgressPhase | undefined>(undefined);
+  const [justFinished, setJustFinished] = useState(false);
+  useEffect(() => {
+    const was = previous.current;
+    previous.current = phase;
+    if (phase !== 'Healthy' || !was || !isActive(was)) return undefined;
+    setJustFinished(true);
+    const timer = setTimeout(() => setJustFinished(false), durationMs);
+    return () => clearTimeout(timer);
+  }, [phase, durationMs]);
+  return justFinished;
+}
 
 // A version as its short SHA, linking to the commit on GitHub when it's one.
 const VersionLink = ({ version, repository }: { version: string; repository: string | null }) => {
@@ -313,6 +330,7 @@ const EnvironmentCard = ({
   });
   const progress = details?.progress;
   const timing = progress ? timingTile(progress) : null;
+  const justFinished = useJustFinished(progress?.phase);
   // A roll back keeps what the Release binds today (database, ...).
   const bindings = Object.fromEntries(
     (details?.bindings ?? [])
@@ -345,6 +363,7 @@ const EnvironmentCard = ({
   return (
     <PlatformEnvironmentCard
       environment={deployment.environment}
+      activity={progress ? cardActivity(progress.phase, justFinished) : undefined}
       status={
         details ? <PhaseStatus details={details} /> : <HealthStatus status={deployment.healthStatus} pending={pending} />
       }

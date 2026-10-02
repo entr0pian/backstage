@@ -101,6 +101,6 @@ export const HealthStatus = ({ status, pending }: { status: string; pending?: bo
   }
 };
 
-export { EnvironmentCard } from './EnvironmentCard';
+export { EnvironmentCard, type EnvironmentActivity } from './EnvironmentCard';
 export { PlatformEmptyState } from './PlatformEmptyState';
 export { environmentAccent, accentGradient } from './environmentAccent';

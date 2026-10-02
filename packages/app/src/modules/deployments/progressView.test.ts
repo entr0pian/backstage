@@ -1,6 +1,7 @@
 import {
   ACTIVE_INTERVAL_MS,
   IDLE_INTERVAL_MS,
+  cardActivity,
   formatDuration,
   timingTile,
   phaseLabel,
@@ -132,5 +133,15 @@ describe('progressView', () => {
       expect(timingTile(progress({ phase: 'Unknown' }), now)).toBeNull();
       expect(timingTile(progress({ phase: 'Healthy', completedAt: null }), now)).toBeNull();
     });
+  });
+
+  it('maps phases to how the card draws attention', () => {
+    expect(cardActivity('Pending', false)).toBe('active');
+    expect(cardActivity('RollingOut', false)).toBe('active');
+    expect(cardActivity('Stalled', false)).toBe('attention');
+    expect(cardActivity('RolloutFailed', false)).toBe('failed');
+    expect(cardActivity('Healthy', true)).toBe('completed');
+    expect(cardActivity('Healthy', false)).toBeUndefined();
+    expect(cardActivity('Unknown', true)).toBeUndefined();
   });
 });
