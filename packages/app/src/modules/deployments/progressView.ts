@@ -7,9 +7,11 @@ import { shortVersion, timeAgo } from '../platformUi';
 
 // Fast while something is happening, slow otherwise. A healthy rollout of a
 // small service can finish between two fast polls (~4s, DEPLOYMENT_CARD_
-// FINDINGS_PART2.md); the fast rate is for the slow and stuck ones.
+// FINDINGS_PART2.md); the fast rate is for the slow and stuck ones. The idle
+// rate is how long a newly applied Release waits to be noticed: Argo CD
+// refreshes on Git webhooks, so this poll is the slowest hop left.
 export const ACTIVE_INTERVAL_MS = 4_000;
-export const IDLE_INTERVAL_MS = 30_000;
+export const IDLE_INTERVAL_MS = 10_000;
 
 const ACTIVE: ProgressPhase[] = ['Pending', 'RollingOut', 'Stalled'];
 
