@@ -171,12 +171,16 @@ catalog:
           branch: 'main'
           repository: '.*'
         schedule:
-          # Was 30 min/3 min — lowered so a newly scaffolded (or deleted)
-          # repository shows up in the Catalog within ~2 minutes instead of
-          # up to half an hour. A full org scan (~17 repos today) completes
-          # in well under a minute, so 1 min timeout has headroom.
-          frequency: { minutes: 2 }
-          timeout: { minutes: 1 }
+          # A newly scaffolded (or deleted) repository shows up in the
+          # Catalog within ~30s. Was 30 min, then 2 min; the 2-min scan could
+          # just miss a scaffold commit and leave a new repo out for ~2.5 min
+          # (checkout, 2026-10-03). A full org scan (~17 repos) is one GitHub
+          # GraphQL query taking a few seconds: ~120/h against the 5000/h
+          # limit. Push webhooks wouldn't help on their own: this provider
+          # drops events without an `organization`, i.e. every event from a
+          # user-owned repo like entr0pian's.
+          frequency: { seconds: 30 }
+          timeout: { seconds: 25 }
   locations:
     # NOTE: app-config.production.yaml (used by the deployed image, see its
     # own CMD in packages/backend/Dockerfile) declares its OWN catalog.locations
