@@ -9,10 +9,14 @@ import {
   fetchApiRef,
   useApi,
 } from '@backstage/core-plugin-api';
-import type { FieldExtensionComponentProps } from '@backstage/plugin-scaffolder-react';
+import type {
+  CustomFieldValidator,
+  FieldExtensionComponentProps,
+} from '@backstage/plugin-scaffolder-react';
 import {
   DEFAULT_AUTO_DEPLOY_ENVIRONMENTS,
   autoDeployAllowed,
+  fetchCommittedRelease,
   type CommittedRelease,
 } from './autoDeploy';
 
@@ -58,16 +62,9 @@ export const AutoDeployToggle = ({
     (async () => {
       setCommitted({ status: 'loading' });
       try {
-        const baseUrl = await discoveryApi.getBaseUrl('platform');
-        const res = await fetchApi.fetch(
-          `${baseUrl}/committed-releases/${encodeURIComponent(component)}/${encodeURIComponent(environment)}`,
-        );
-        const body = await res.json();
-        if (!res.ok) {
-          throw new Error(body?.error ?? `${res.status} ${res.statusText}`);
-        }
+        const release = await fetchCommittedRelease(discoveryApi, fetchApi, component, environment);
         if (!cancelled) {
-          setCommitted({ status: 'done', key, release: body });
+          setCommitted({ status: 'done', key, release });
         }
       } catch (error) {
         if (!cancelled) {
@@ -108,7 +105,7 @@ export const AutoDeployToggle = ({
   } else if (committed.status === 'loading') {
     helperText = 'Loading the committed Release…';
   } else if (committed.status === 'error') {
-    helperText = `Could not load the committed Release: ${committed.error}`;
+    helperText = `Could not load the committed Release, so whether auto-deploy is on is unknown: ${committed.error}. Reload to try again.`;
   } else if (formData) {
     helperText = 'Every successful build on main deploys automatically. No version to choose.';
   }
@@ -120,7 +117,7 @@ export const AutoDeployToggle = ({
           <Switch
             color="primary"
             checked={available && Boolean(formData)}
-            disabled={!available || committed.status === 'loading'}
+            disabled={!available || committed.status === 'loading' || committed.status === 'error'}
             onChange={e => onChange(e.target.checked)}
           />
         }
@@ -129,4 +126,40 @@ export const AutoDeployToggle = ({
       <FormHelperText>{helperText}</FormHelperText>
     </FormControl>
   );
+};
+
+// Blocks submit when the committed Release can't be read in an auto-deploy
+// environment. Without it, a failed lookup would leave the toggle at its
+// default (off), and the PR would pin a version, quietly turning off an
+// auto-deploy that's on in git. Checked again here, not from the toggle's
+// state, because a validator only sees the form data.
+export const autoDeployToggleValidation: CustomFieldValidator<boolean> = async (
+  _value,
+  validation,
+  { apiHolder, formData },
+) => {
+  const configApi = apiHolder.get(configApiRef);
+  const discoveryApi = apiHolder.get(discoveryApiRef);
+  const fetchApi = apiHolder.get(fetchApiRef);
+  const component = formData?.componentName;
+  const environment = formData?.environment;
+  const allowed =
+    configApi?.getOptionalStringArray('platform.autoDeployEnvironments') ??
+    DEFAULT_AUTO_DEPLOY_ENVIRONMENTS;
+  if (
+    !discoveryApi ||
+    !fetchApi ||
+    typeof component !== 'string' ||
+    typeof environment !== 'string' ||
+    !autoDeployAllowed(environment, allowed)
+  ) {
+    return;
+  }
+  try {
+    await fetchCommittedRelease(discoveryApi, fetchApi, component, environment);
+  } catch (error) {
+    validation.addError(
+      `Could not check whether auto-deploy is on for ${component} in ${environment} (${(error as Error).message}). Reload the page and try again.`,
+    );
+  }
 };
