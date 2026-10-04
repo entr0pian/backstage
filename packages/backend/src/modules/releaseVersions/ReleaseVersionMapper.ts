@@ -14,12 +14,21 @@ export interface ReleaseCustomResource {
       name?: string;
     };
     environment?: string;
+    // Unset when autoDeploy is enabled: release-operator picks the version
+    // and records it in status.autoDeploy instead (see effectiveVersion).
     version?: string;
+    autoDeploy?: { enabled?: boolean };
     // Read by the environment summary (modules/environmentSummary/), not
     // by the version mapping below.
     bindings?: Record<string, { enabled?: boolean; ref?: string } | undefined>;
   };
   status?: {
+    autoDeploy?: {
+      deployedVersion?: string;
+      runNumber?: number;
+      runURL?: string;
+      deployedAt?: string;
+    };
     conditions?: {
       type?: string;
       status?: string;
@@ -33,6 +42,23 @@ export interface ReleaseVersion {
   environment: string;
   version: string;
   releaseName: string;
+  // The Release follows main (spec.autoDeploy.enabled) rather than a
+  // pinned version: the card shows it and hides Roll back.
+  autoDeploy: boolean;
+}
+
+export function isAutoDeploy(release: ReleaseCustomResource): boolean {
+  return release.spec?.autoDeploy?.enabled === true;
+}
+
+// The version a Release deploys: spec.version when pinned, or what
+// release-operator last auto-deployed (status.autoDeploy.deployedVersion) —
+// empty until the first CI build has been deployed.
+export function effectiveVersion(release: ReleaseCustomResource): string {
+  if (isAutoDeploy(release)) {
+    return release.status?.autoDeploy?.deployedVersion ?? '';
+  }
+  return release.spec?.version ?? '';
 }
 
 export interface MapperError {
@@ -67,9 +93,9 @@ export function mapReleaseToVersion(
   // version is display-only and intentionally shown as-is — see
   // BACKSTAGE_PART5.md Step 2: "latest" is never resolved to a concrete
   // SHA/tag/digest here.
-  const version = release.spec?.version ?? '';
+  const version = effectiveVersion(release);
 
-  return { environment, version, releaseName: crName };
+  return { environment, version, releaseName: crName, autoDeploy: isAutoDeploy(release) };
 }
 
 // Filters a mixed-component list of Release CRs down to one component's

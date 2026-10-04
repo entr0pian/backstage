@@ -14,6 +14,11 @@ const environmentPicker = FormFieldBlueprint.make({
   params: { field: () => import('./fields').then(m => m.environmentPickerField) },
 });
 
+const autoDeployToggle = FormFieldBlueprint.make({
+  name: 'platform-auto-deploy-toggle',
+  params: { field: () => import('./fields').then(m => m.autoDeployToggleField) },
+});
+
 const versionPicker = FormFieldBlueprint.make({
   name: 'platform-version-picker',
   params: { field: () => import('./fields').then(m => m.versionPickerField) },
@@ -26,5 +31,5 @@ const dependencyBindingsPicker = FormFieldBlueprint.make({
 
 export const createDeploymentModule = createFrontendModule({
   pluginId: 'scaffolder',
-  extensions: [componentPicker, environmentPicker, versionPicker, dependencyBindingsPicker],
+  extensions: [componentPicker, environmentPicker, autoDeployToggle, versionPicker, dependencyBindingsPicker],
 });

@@ -8,7 +8,12 @@ spec:
   componentRef:
     name: ${{ values.componentName }}
   environment: ${{ values.environment }}
+{%- if values.autoDeploy %}
+  autoDeploy:
+    enabled: true
+{%- else %}
   version: "${{ values.version }}"
+{%- endif %}
 {%- if values.bindings.database %}
   bindings:
     database:

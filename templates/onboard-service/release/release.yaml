@@ -1,0 +1,12 @@
+apiVersion: platform.taskapp.io/v1alpha1
+kind: Release
+metadata:
+  name: ${{ values.name }}-${{ values.environment }}
+  labels:
+    platform.taskapp.io/component: ${{ values.name }}
+spec:
+  componentRef:
+    name: ${{ values.name }}
+  environment: ${{ values.environment }}
+  autoDeploy:
+    enabled: true

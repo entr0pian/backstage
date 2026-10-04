@@ -4,8 +4,9 @@ metadata:
   name: create-deployment
   title: Create deployment
   description: >-
-    Ship a built version of a service to an environment. Opens a pull request
-    with its Release; once it's merged, Argo CD rolls it out.
+    Ship a built version of a service to an environment, or (in dev) turn on
+    auto-deploy so every successful build on main ships on its own. Opens a
+    pull request with its Release; once it's merged, Argo CD rolls it out.
 spec:
   owner: user:guest
   type: deployment
@@ -15,7 +16,17 @@ spec:
       required:
         - componentName
         - environment
-        - version
+      # Version is required unless Auto-deploy is on — then there is none:
+      # release-operator deploys every successful build on main itself.
+      if:
+        properties:
+          autoDeploy:
+            const: true
+        required:
+          - autoDeploy
+      else:
+        required:
+          - version
       properties:
         componentName:
           title: Component
@@ -27,10 +38,16 @@ spec:
           type: string
           description: Where it should run.
           ui:field: PlatformEnvironmentPicker
+        autoDeploy:
+          title: Auto-deploy
+          type: boolean
+          description: Deploy every successful build on main automatically, with no version to pick.
+          default: false
+          ui:field: PlatformAutoDeployToggle
         version:
           title: Version
           type: string
-          description: Any commit on main with a green build.
+          description: Any commit on main with a green build. Not used when Auto-deploy is on.
           pattern: '^[0-9a-f]{40}$'
           ui:field: PlatformVersionPicker
         bindings:
@@ -49,6 +66,7 @@ spec:
         values:
           componentName: ${{ parameters.componentName }}
           environment: ${{ parameters.environment }}
+          autoDeploy: ${{ parameters.autoDeploy or false }}
           version: ${{ parameters.version }}
           bindings: ${{ parameters.bindings or {} }}
 
@@ -63,15 +81,16 @@ spec:
           - from: platform/environments/${{ parameters.environment }}/release.yaml
             to: platform/environments/${{ parameters.environment }}/${{ parameters.componentName }}-release.yaml
 
-    # One PR per deployment: the branch carries the version, so each deploy
-    # gets its own PR and merging it is what deploys that version.
+    # One PR per deployment: the branch carries the version (or "auto" when
+    # turning on auto-deploy), so each deploy gets its own PR and merging it
+    # is what deploys that version.
     - id: open-pr
       name: Open pull request
       action: publish:github:pull-request
       input:
         repoUrl: github.com?repo=application-repositories&owner=entr0pian
-        branchName: backstage/deploy-${{ parameters.componentName }}-${{ parameters.environment }}-${{ parameters.version | truncate(7, true, "") }}
-        title: 'Deploy ${{ parameters.componentName }} ${{ parameters.version | truncate(7, true, "") }} to ${{ parameters.environment }}'
+        branchName: backstage/deploy-${{ parameters.componentName }}-${{ parameters.environment }}-${{ 'auto' if parameters.autoDeploy else (parameters.version | truncate(7, true, "")) }}
+        title: ${{ ('Enable auto-deploy for ' + parameters.componentName + ' in ' + parameters.environment) if parameters.autoDeploy else ('Deploy ' + parameters.componentName + ' ' + (parameters.version | truncate(7, true, "")) + ' to ' + parameters.environment) }}
         description: |-
           Sets the `Release` for `${{ parameters.componentName }}` in `${{ parameters.environment }}`.
 
@@ -79,16 +98,20 @@ spec:
           |---|---|
           | Component | `${{ parameters.componentName }}` |
           | Environment | `${{ parameters.environment }}` |
-          | Version | `${{ parameters.version }}` |
+          | Version | ${{ 'auto-deploy: every successful build on `main`' if parameters.autoDeploy else ('`' + parameters.version + '`') }} |
           | Database | ${{ ('`' + parameters.bindings.database + '`') if (parameters.bindings and parameters.bindings.database) else 'not bound' }} |
 
           Generated through Backstage's **Create deployment** template. Writes
           the whole of `platform/environments/${{ parameters.environment }}/${{ parameters.componentName }}-release.yaml`:
           for a new environment that's a new file, for an existing one the
-          diff is only what changed (usually `version:`).
+          diff is only what changed (usually `version:`; `autoDeploy:` in
+          place of `version:` when turning auto-deploy on, and the reverse
+          when pinning a version again).
 
           Merging deploys it: release-operator writes the component's
-          environment files and Argo CD syncs them.
+          environment files and Argo CD syncs them. With auto-deploy on,
+          release-operator keeps doing that for every new successful build on
+          `main`, with no further PRs.
 
   output:
     links:

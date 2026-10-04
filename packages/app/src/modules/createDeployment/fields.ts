@@ -2,6 +2,7 @@ import { createFormField } from '@backstage/plugin-scaffolder-react/alpha';
 import { ComponentPicker } from './ComponentPicker';
 import { EnvironmentPicker } from './EnvironmentPicker';
 import { VersionPicker } from './VersionPicker';
+import { AutoDeployToggle } from './AutoDeployToggle';
 import { DependencyBindingsPicker } from './DependencyBindingsPicker';
 
 // `ui:field` names used by templates/create-deployment/template.yaml (and
@@ -14,6 +15,11 @@ export const componentPickerField = createFormField({
 export const environmentPickerField = createFormField({
   name: 'PlatformEnvironmentPicker',
   component: EnvironmentPicker,
+});
+
+export const autoDeployToggleField = createFormField({
+  name: 'PlatformAutoDeployToggle',
+  component: AutoDeployToggle,
 });
 
 export const versionPickerField = createFormField({

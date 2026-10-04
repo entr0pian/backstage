@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import Box from '@material-ui/core/Box';
+import Chip from '@material-ui/core/Chip';
 import Button from '@material-ui/core/Button';
 import Divider from '@material-ui/core/Divider';
 import Grid from '@material-ui/core/Grid';
@@ -344,7 +345,10 @@ const EnvironmentCard = ({
       .filter(b => b.declaredByRelease && b.providerRef)
       .map(b => [b.name, b.providerRef!.name]),
   );
-  const rollbackHref = canDeploy
+  // An auto-deploy environment has no Roll back: the next build on main
+  // would deploy straight over it. Revert on main, or pin a version with
+  // Create deployment (Auto-deploy off), instead.
+  const rollbackHref = canDeploy && !deployment.autoDeploy
     ? (version: string) => createDeploymentHref(component, { environment: deployment.environment, version, bindings })
     : undefined;
 
@@ -376,6 +380,11 @@ const EnvironmentCard = ({
       }
       action={
         <div className={classes.headerAction}>
+          {deployment.autoDeploy && (
+            <Tooltip title="Every successful build on main deploys here automatically">
+              <Chip size="small" variant="outlined" color="primary" icon={<SyncIcon />} label="Auto-deploy" />
+            </Tooltip>
+          )}
           {headline && <span>{headline}</span>}
           <IconButton
             size="small"

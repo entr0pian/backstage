@@ -40,6 +40,7 @@ describe('joinDeployments', () => {
         environment: 'management',
         version: 'latest',
         releaseName: 'payments-management',
+        autoDeploy: false,
         argoApplicationName: 'payments-management',
         argoApplicationNamespace: 'argocd',
         syncStatus: 'Synced',
@@ -112,7 +113,7 @@ describe('joinDeployments', () => {
       [],
     );
     expect(result).toEqual([
-      { environment: 'dev', version: 'latest', releaseName: 'payments-dev', ...noDelivery },
+      { environment: 'dev', version: 'latest', releaseName: 'payments-dev', autoDeploy: false, ...noDelivery },
     ]);
   });
 
@@ -156,7 +157,7 @@ describe('joinDeployments', () => {
       ],
     );
     expect(result).toEqual([
-      { environment: 'dev', version: 'latest', releaseName: 'payments-dev', ...noDelivery },
+      { environment: 'dev', version: 'latest', releaseName: 'payments-dev', autoDeploy: false, ...noDelivery },
     ]);
   });
 
@@ -182,5 +183,14 @@ describe('joinDeployments', () => {
       ['management', 'dev', 'prod'],
     );
     expect(result.map(d => d.environment)).toEqual(['management', 'dev', 'prod']);
+  });
+
+  it('carries a Release\'s auto-deploy flag onto its deployment', () => {
+    const [dev] = joinDeployments(
+      [{ environment: 'dev', version: 'a'.repeat(40), releaseName: 'payments-dev', autoDeploy: true }],
+      [],
+    );
+    expect(dev.autoDeploy).toBe(true);
+    expect(dev.version).toBe('a'.repeat(40));
   });
 });
