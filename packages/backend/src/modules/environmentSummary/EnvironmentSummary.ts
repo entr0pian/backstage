@@ -123,7 +123,9 @@ export interface K8sEvent {
 export interface ReleaseForSummary {
   name: string;
   namespace: string;
+  // Empty for an auto-deploy Release before its first build.
   version: string;
+  autoDeploy: boolean;
   bindings: Record<string, { enabled?: boolean; ref?: string } | undefined>;
   ready: K8sCondition | null;
 }
@@ -198,6 +200,7 @@ export interface EnvironmentSummary {
     name: string;
     namespace: string;
     version: string;
+    autoDeploy: boolean;
     ready: boolean | null;
     reason: string | null;
   } | null;
@@ -521,6 +524,7 @@ export function buildEnvironmentSummary(
           name: release.name,
           namespace: release.namespace,
           version: release.version,
+          autoDeploy: release.autoDeploy,
           ready: release.ready ? release.ready.status === 'True' : null,
           reason: release.ready?.reason ?? null,
         }

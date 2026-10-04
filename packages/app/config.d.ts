@@ -38,6 +38,14 @@ export interface Config {
      */
     environments?: string[];
     /**
+     * Environments where a Release may follow main instead of a pinned
+     * version (the Create deployment template's Auto-deploy toggle; greyed
+     * out everywhere else). Must match release-operator's
+     * --auto-deploy-environments, which enforces it. Defaults to ["dev"].
+     * @visibility frontend
+     */
+    autoDeployEnvironments?: string[];
+    /**
      * Backend only: folder of registered workload clusters, one
      * <env>/{clusterName,server,caData} per cluster, written by the chart's
      * ExternalSecrets. Unset: only the local cluster is used.

@@ -10,7 +10,7 @@ describe('mapReleaseToVersion', () => {
       spec: { componentRef: { name: 'payments' }, environment: 'dev', version: 'latest' },
     });
     expect('error' in result).toBe(false);
-    expect(result).toEqual({ environment: 'dev', version: 'latest', releaseName: 'payments-dev' });
+    expect(result).toEqual({ environment: 'dev', version: 'latest', releaseName: 'payments-dev', autoDeploy: false });
   });
 
   it('displays version exactly as configured, never resolving "latest"', () => {
@@ -18,7 +18,7 @@ describe('mapReleaseToVersion', () => {
       metadata: { name: 'payments-prod', namespace: 'prod' },
       spec: { componentRef: { name: 'payments' }, environment: 'prod', version: 'v1.2.3' },
     });
-    expect(result).toEqual({ environment: 'prod', version: 'v1.2.3', releaseName: 'payments-prod' });
+    expect(result).toEqual({ environment: 'prod', version: 'v1.2.3', releaseName: 'payments-prod', autoDeploy: false });
   });
 
   it('errors when spec.componentRef.name is missing', () => {
@@ -47,7 +47,7 @@ describe('mapReleaseToVersion', () => {
       metadata: { name: 'payments-dev', namespace: 'dev' },
       spec: { componentRef: { name: 'payments' }, environment: 'dev' },
     });
-    expect(result).toEqual({ environment: 'dev', version: '', releaseName: 'payments-dev' });
+    expect(result).toEqual({ environment: 'dev', version: '', releaseName: 'payments-dev', autoDeploy: false });
   });
 });
 
@@ -70,8 +70,8 @@ describe('releaseVersionsForComponent', () => {
   it('returns every environment for the requested component, independently', () => {
     const result = releaseVersionsForComponent(releases, 'payments');
     expect(result).toEqual([
-      { environment: 'dev', version: 'latest', releaseName: 'payments-dev' },
-      { environment: 'prod', version: 'v1.2.3', releaseName: 'payments-prod' },
+      { environment: 'dev', version: 'latest', releaseName: 'payments-dev', autoDeploy: false },
+      { environment: 'prod', version: 'v1.2.3', releaseName: 'payments-prod', autoDeploy: false },
     ]);
   });
 
@@ -79,7 +79,7 @@ describe('releaseVersionsForComponent', () => {
     const result = releaseVersionsForComponent(releases, 'payments');
     expect(result.some(r => r.environment === 'dev' && r.version !== 'latest')).toBe(false);
     expect(releaseVersionsForComponent(releases, 'checkout')).toEqual([
-      { environment: 'dev', version: 'latest', releaseName: 'checkout-dev' },
+      { environment: 'dev', version: 'latest', releaseName: 'checkout-dev', autoDeploy: false },
     ]);
   });
 
@@ -110,9 +110,33 @@ describe('releaseVersionsForComponent', () => {
     const onError = jest.fn();
     const result = releaseVersionsForComponent(withMalformed, 'payments', onError);
     expect(result).toEqual([
-      { environment: 'dev', version: 'latest', releaseName: 'payments-dev' },
-      { environment: 'prod', version: 'v1.2.3', releaseName: 'payments-prod' },
+      { environment: 'dev', version: 'latest', releaseName: 'payments-dev', autoDeploy: false },
+      { environment: 'prod', version: 'v1.2.3', releaseName: 'payments-prod', autoDeploy: false },
     ]);
     expect(onError).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('auto-deploy Releases', () => {
+  it('reports spec.version, which release-operator keeps current in git', () => {
+    const result = mapReleaseToVersion({
+      metadata: { name: 'payments-dev', namespace: 'dev' },
+      spec: { componentRef: { name: 'payments' }, environment: 'dev', version: 'a'.repeat(40), autoDeploy: { branch: 'main' } },
+      status: { autoDeploy: { branch: 'main', latestDeployable: 'b'.repeat(40), reason: 'Deploying' } },
+    });
+    expect(result).toEqual({
+      environment: 'dev',
+      version: 'a'.repeat(40),
+      releaseName: 'payments-dev',
+      autoDeploy: true,
+    });
+  });
+
+  it('has an empty version until the first build has been committed', () => {
+    const result = mapReleaseToVersion({
+      metadata: { name: 'payments-dev', namespace: 'dev' },
+      spec: { componentRef: { name: 'payments' }, environment: 'dev', autoDeploy: { branch: 'main' } },
+    });
+    expect(result).toEqual({ environment: 'dev', version: '', releaseName: 'payments-dev', autoDeploy: true });
   });
 });

@@ -14,12 +14,23 @@ export interface ReleaseCustomResource {
       name?: string;
     };
     environment?: string;
+    // With autoDeploy, release-operator keeps this at the newest build on
+    // autoDeploy.branch (committed to the Release file in git); unset only
+    // before the first build.
     version?: string;
+    autoDeploy?: { branch?: string };
     // Read by the environment summary (modules/environmentSummary/), not
     // by the version mapping below.
     bindings?: Record<string, { enabled?: boolean; ref?: string } | undefined>;
   };
   status?: {
+    autoDeploy?: {
+      branch?: string;
+      latestDeployable?: string;
+      runURL?: string;
+      reason?: string;
+      message?: string;
+    };
     conditions?: {
       type?: string;
       status?: string;
@@ -33,6 +44,13 @@ export interface ReleaseVersion {
   environment: string;
   version: string;
   releaseName: string;
+  // The Release follows main (spec.autoDeploy.enabled) rather than a
+  // pinned version: the card shows it and hides Roll back.
+  autoDeploy: boolean;
+}
+
+export function isAutoDeploy(release: ReleaseCustomResource): boolean {
+  return Boolean(release.spec?.autoDeploy?.branch);
 }
 
 export interface MapperError {
@@ -69,7 +87,7 @@ export function mapReleaseToVersion(
   // SHA/tag/digest here.
   const version = release.spec?.version ?? '';
 
-  return { environment, version, releaseName: crName };
+  return { environment, version, releaseName: crName, autoDeploy: isAutoDeploy(release) };
 }
 
 // Filters a mixed-component list of Release CRs down to one component's

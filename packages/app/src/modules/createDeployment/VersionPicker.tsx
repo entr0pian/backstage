@@ -61,6 +61,9 @@ export const VersionPicker = ({
   // Opened with a version already chosen (a deployment card's Roll back): it
   // stays locked to it, like ComponentPicker. Decided once, on open.
   const [locked] = useState(() => Boolean(formData));
+  // Auto-deploy on (AutoDeployToggle): the operator picks every version, so
+  // there's nothing to choose and nothing may be submitted.
+  const autoDeploy: boolean = Boolean(formContext?.formData?.autoDeploy);
   const [state, setState] = useState<VersionsState>({ status: 'loading' });
 
   useEffect(() => {
@@ -92,6 +95,12 @@ export const VersionPicker = ({
     };
   }, [discoveryApi, fetchApi, component]);
 
+  useEffect(() => {
+    if (autoDeploy && formData) {
+      onChange(undefined as unknown as string);
+    }
+  }, [autoDeploy, formData, onChange]);
+
   const versions = state.status === 'done' ? state.versions : [];
   let helperText = schema.description;
   if (state.status === 'loading') {
@@ -101,19 +110,22 @@ export const VersionPicker = ({
   } else if (versions.length === 0) {
     helperText = 'No commit on main has a built image yet.';
   }
+  if (autoDeploy) {
+    helperText = 'Auto-deploy is on: every successful build on main deploys automatically.';
+  }
 
   return (
     <FormControl
       fullWidth
       margin="normal"
-      required={required}
-      error={!!rawErrors?.length || state.status === 'error'}
-      disabled={locked || versions.length === 0}
+      required={required && !autoDeploy}
+      error={!autoDeploy && (!!rawErrors?.length || state.status === 'error')}
+      disabled={locked || autoDeploy || versions.length === 0}
     >
       <InputLabel id="version-picker-label">{schema.title ?? 'Version'}</InputLabel>
       <Select
         labelId="version-picker-label"
-        value={locked || versions.some(v => v.sha === formData) ? formData ?? '' : ''}
+        value={!autoDeploy && (locked || versions.some(v => v.sha === formData)) ? formData ?? '' : ''}
         onChange={e => onChange(e.target.value as string)}
         renderValue={value => {
           const v = versions.find(x => x.sha === value);

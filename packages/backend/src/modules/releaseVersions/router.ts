@@ -12,6 +12,8 @@ import { buildEnvironmentSummary } from '../environmentSummary/EnvironmentSummar
 import type { DatabaseSummaryReader } from '../databaseSummary/DatabaseSummaryReader';
 import { buildDatabaseSummary } from '../databaseSummary/DatabaseSummary';
 import type { DeployableVersionReader } from './DeployableVersionReader';
+import type { CommittedReleaseReader } from './CommittedReleaseReader';
+import { isValidName } from './CommittedReleaseMapper';
 import type { ScaffoldVersionReader } from '../scaffoldVersions/ScaffoldVersionReader';
 import { isValidScaffoldName } from '../scaffoldVersions/ScaffoldVersionMapper';
 
@@ -25,11 +27,12 @@ export function createRouter(options: {
   environments: EnvironmentSummaryReader;
   databases: DatabaseSummaryReader;
   versions: DeployableVersionReader;
+  committed: CommittedReleaseReader;
   scaffolds: ScaffoldVersionReader;
   httpAuth: HttpAuthService;
   permissions: PermissionsService;
 }): ExpressRouter {
-  const { reader, environments, databases, versions, scaffolds, httpAuth, permissions } = options;
+  const { reader, environments, databases, versions, committed, scaffolds, httpAuth, permissions } = options;
   const router = Router();
 
   // Owner-only detail is decided per request, server-side, by whether the
@@ -63,6 +66,21 @@ export function createRouter(options: {
       return;
     }
     res.json({ component, repository: result.repository, versions: result.versions });
+  });
+
+  // GET /api/platform/committed-releases/:component/:environment ->
+  // { component, environment, exists, autoDeploy, version, bindings } — the
+  // Release manifest as committed on application-repositories' main, for
+  // the Create deployment form to start from (its Auto-deploy toggle shows
+  // what's in git, not a default). Nothing sensitive: the same file is in
+  // the GitOps repo.
+  router.get('/committed-releases/:component/:environment', async (req, res) => {
+    const { component, environment } = req.params;
+    if (!isValidName(component) || !isValidName(environment)) {
+      res.status(400).json({ error: `Invalid component or environment name: ${component}/${environment}` });
+      return;
+    }
+    res.json({ component, environment, ...(await committed.read(component, environment)) });
   });
 
   // GET /api/platform/scaffolds/:template/versions -> { template, latest,

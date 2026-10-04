@@ -5,10 +5,11 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 // Standalone, dependency-free check that the skeleton renders the Release
-// manifest release-operator expects, with and without a database binding.
-// Like add-database's render test this is a minimal stand-in for the
-// scaffolder's nunjucks, supporting only what the skeleton uses:
-// `${{ values.a.b }}` and a whitespace-trimming `{%- if values.a.b %}` block.
+// manifest release-operator expects: pinned or auto-deploy, with and
+// without a database binding. Like add-database's render test this is a
+// minimal stand-in for the scaffolder's nunjucks, supporting only what the
+// skeleton uses: `${{ values.a.b }}` and a whitespace-trimming
+// `{%- if values.a.b %}` block with an optional `{%- else %}`.
 //
 // Run with: node --test templates/create-deployment/render.test.mjs
 
@@ -20,8 +21,8 @@ const lookup = (values, path) =>
 
 function render(values) {
   const withBlocks = source.replace(
-    /\s*\{%-\s*if\s+values\.([\w.]+)\s*%\}([\s\S]*?)\s*\{%-\s*endif\s*%\}/g,
-    (_, path, body) => (lookup(values, path) ? body.replace(/\s+$/, '') : ''),
+    /\s*\{%-\s*if\s+values\.([\w.]+)\s*%\}([\s\S]*?)(?:\s*\{%-\s*else\s*%\}([\s\S]*?))?\s*\{%-\s*endif\s*%\}/g,
+    (_, path, body, elseBody = '') => (lookup(values, path) ? body : elseBody).replace(/\s+$/, ''),
   );
   return withBlocks.replace(/\$\{\{\s*values\.([\w.]+)\s*\}\}/g, (_, path) => {
     const value = lookup(values, path);
@@ -77,4 +78,52 @@ spec:
   version: "${SHA}"
 `,
   );
+});
+
+test('turning auto-deploy on renders autoDeploy.branch and leaves version to release-operator', () => {
+  assert.equal(
+    render({ componentName: 'orders', environment: 'dev', autoDeploy: true, bindings: {} }),
+    `apiVersion: platform.taskapp.io/v1alpha1
+kind: Release
+metadata:
+  name: orders-dev
+  labels:
+    platform.taskapp.io/component: orders
+spec:
+  componentRef:
+    name: orders
+  environment: dev
+  autoDeploy:
+    branch: main
+`,
+  );
+});
+
+test('renders an auto-deploy Release that keeps its database binding', () => {
+  assert.equal(
+    render({ componentName: 'orders', environment: 'dev', autoDeploy: true, bindings: { database: 'orders-db' } }),
+    `apiVersion: platform.taskapp.io/v1alpha1
+kind: Release
+metadata:
+  name: orders-dev
+  labels:
+    platform.taskapp.io/component: orders
+spec:
+  componentRef:
+    name: orders
+  environment: dev
+  autoDeploy:
+    branch: main
+  bindings:
+    database:
+      enabled: true
+      ref: orders-db
+`,
+  );
+});
+
+test('turning auto-deploy off pins the chosen version again', () => {
+  const rendered = render({ componentName: 'orders', environment: 'dev', autoDeploy: false, version: SHA, bindings: {} });
+  assert.match(rendered, new RegExp(`version: "${SHA}"`));
+  assert.doesNotMatch(rendered, /autoDeploy/);
 });

@@ -6,6 +6,7 @@ import {
 } from '@backstage/integration';
 import { ReleaseVersionReader } from './ReleaseVersionReader';
 import { DeployableVersionReader } from './DeployableVersionReader';
+import { CommittedReleaseReader } from './CommittedReleaseReader';
 import { createRouter } from './router';
 import { EnvironmentSummaryReader } from '../environmentSummary/EnvironmentSummaryReader';
 import { ClusterKubeConfigs } from '../platformClusters/ClusterKubeConfigs';
@@ -18,6 +19,8 @@ import { createObservabilityRouter } from '../observabilitySummary/router';
 // GET /api/platform/environments/:component/:environment and
 // GET /api/platform/databases/:namespace/:name (BACKSTAGE_PART9.md) and
 // GET /api/platform/versions/:component (DEPLOYMENTS.md Step 1) and
+// GET /api/platform/committed-releases/:component/:environment (Create
+// deployment's Auto-deploy toggle) and
 // GET /api/platform/scaffolds/:template/versions (Onboard Service's Scaffold
 // version picker — reads GitHub only, but shares this router). Gated on
 // platformCatalog.enabled/platformCatalog.namespaces — the same flag and
@@ -90,6 +93,7 @@ export const releaseVersionsModule = createBackendPlugin({
               githubCredentials,
               logger,
             }),
+            committed: new CommittedReleaseReader({ githubCredentials }),
             scaffolds: new ScaffoldVersionReader({ githubCredentials }),
             httpAuth,
             permissions,

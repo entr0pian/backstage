@@ -13,6 +13,7 @@ function paymentsObjects(overrides: Partial<EnvironmentObjects> = {}): Environme
       name: 'payments-management',
       namespace: 'management',
       version: SHA,
+      autoDeploy: false,
       bindings: { database: { enabled: true, ref: 'payments-db' } },
       ready: { type: 'Ready', status: 'True', reason: 'Synced' },
     },
@@ -105,6 +106,7 @@ describe('buildEnvironmentSummary', () => {
       name: 'payments-management',
       namespace: 'management',
       version: SHA,
+      autoDeploy: false,
       ready: true,
       reason: 'Synced',
     });
@@ -353,6 +355,7 @@ describe('buildEnvironmentSummary', () => {
           name: 'payments-dev',
           namespace: 'dev',
           version: 'v1',
+          autoDeploy: false,
           bindings: {},
           ready: null,
         },

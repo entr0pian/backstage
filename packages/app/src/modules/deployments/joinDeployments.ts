@@ -17,6 +17,9 @@ export interface ReleaseVersion {
   environment: string;
   version: string;
   releaseName: string;
+  // Follows main (release-operator deploys every successful build) rather
+  // than a pinned version; absent from older backends.
+  autoDeploy?: boolean;
 }
 
 // Subset of ArgoCD's Application resource shape that argocd-backend's
@@ -43,6 +46,8 @@ export interface Deployment {
   // null: an Argo Application exists with no matching Release.
   version: string | null;
   releaseName: string | null;
+  // The Release auto-deploys main: no Roll back, an Auto-deploy badge.
+  autoDeploy: boolean;
   // null: a Release exists but Argo CD has no Application for it (yet).
   argoApplicationName: string | null;
   argoApplicationNamespace: string | null;
@@ -126,6 +131,7 @@ export function joinDeployments(
       environment: release.environment,
       version: release.version,
       releaseName: release.releaseName,
+      autoDeploy: release.autoDeploy ?? false,
       ...emptyDelivery(),
     });
   }
@@ -147,6 +153,7 @@ export function joinDeployments(
         environment,
         version: null,
         releaseName: null,
+        autoDeploy: false,
         ...deliveryFrom(app),
       });
     }

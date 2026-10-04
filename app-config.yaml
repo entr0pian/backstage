@@ -273,6 +273,11 @@ platform:
   # values/backstage/management.yaml), so adding a cluster needs no rebuild.
   environments:
     - management
+  # Where the Create deployment template's Auto-deploy toggle is offered
+  # (greyed out elsewhere). Keep in step with release-operator's
+  # --auto-deploy-environments, which is what actually enforces it.
+  autoDeployEnvironments:
+    - dev
 
 platformCatalog:
   enabled: false

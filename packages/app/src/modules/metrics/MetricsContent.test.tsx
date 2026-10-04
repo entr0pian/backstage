@@ -61,6 +61,7 @@ function deploymentsIn(...environments: string[]) {
       environment,
       version: 'v1',
       releaseName: `payments-${environment}`,
+      autoDeploy: false,
       argoApplicationName: `payments-${environment}`,
       argoApplicationNamespace: 'argocd',
       syncStatus: 'Synced',
