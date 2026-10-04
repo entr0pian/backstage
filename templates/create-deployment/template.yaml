@@ -104,14 +104,14 @@ spec:
           Generated through Backstage's **Create deployment** template. Writes
           the whole of `platform/environments/${{ parameters.environment }}/${{ parameters.componentName }}-release.yaml`:
           for a new environment that's a new file, for an existing one the
-          diff is only what changed (usually `version:`; `autoDeploy:` in
-          place of `version:` when turning auto-deploy on, and the reverse
-          when pinning a version again).
+          diff is only what changed (usually `version:`; turning auto-deploy
+          on adds `autoDeploy: {branch: main}` and drops `version:`, which
+          release-operator then sets to the newest build).
 
           Merging deploys it: release-operator writes the component's
           environment files and Argo CD syncs them. With auto-deploy on,
-          release-operator keeps doing that for every new successful build on
-          `main`, with no further PRs.
+          release-operator commits each newer successful build on `main` to
+          this same file as `version:`, with no further PRs.
 
   output:
     links:

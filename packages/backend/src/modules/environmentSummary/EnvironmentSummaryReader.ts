@@ -6,7 +6,7 @@ import {
 } from '@kubernetes/client-node';
 import type { LoggerService } from '@backstage/backend-plugin-api';
 import type { ReleaseVersionReader } from '../releaseVersions/ReleaseVersionReader';
-import { effectiveVersion, isAutoDeploy, type ReleaseCustomResource } from '../releaseVersions/ReleaseVersionMapper';
+import { isAutoDeploy, type ReleaseCustomResource } from '../releaseVersions/ReleaseVersionMapper';
 import type { ClusterKubeConfigs } from '../platformClusters/ClusterKubeConfigs';
 import type {
   EnvironmentObjects,
@@ -177,7 +177,7 @@ export class EnvironmentSummaryReader {
     return {
       name: match.metadata.name,
       namespace: match.metadata.namespace,
-      version: effectiveVersion(match),
+      version: match.spec?.version ?? '',
       autoDeploy: isAutoDeploy(match),
       bindings: match.spec?.bindings ?? {},
       ready: match.status?.conditions?.find(c => c.type === 'Ready') ?? null,

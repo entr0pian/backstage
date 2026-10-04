@@ -14,20 +14,22 @@ export interface ReleaseCustomResource {
       name?: string;
     };
     environment?: string;
-    // Unset when autoDeploy is enabled: release-operator picks the version
-    // and records it in status.autoDeploy instead (see effectiveVersion).
+    // With autoDeploy, release-operator keeps this at the newest build on
+    // autoDeploy.branch (committed to the Release file in git); unset only
+    // before the first build.
     version?: string;
-    autoDeploy?: { enabled?: boolean };
+    autoDeploy?: { branch?: string };
     // Read by the environment summary (modules/environmentSummary/), not
     // by the version mapping below.
     bindings?: Record<string, { enabled?: boolean; ref?: string } | undefined>;
   };
   status?: {
     autoDeploy?: {
-      deployedVersion?: string;
-      runNumber?: number;
+      branch?: string;
+      latestDeployable?: string;
       runURL?: string;
-      deployedAt?: string;
+      reason?: string;
+      message?: string;
     };
     conditions?: {
       type?: string;
@@ -48,17 +50,7 @@ export interface ReleaseVersion {
 }
 
 export function isAutoDeploy(release: ReleaseCustomResource): boolean {
-  return release.spec?.autoDeploy?.enabled === true;
-}
-
-// The version a Release deploys: spec.version when pinned, or what
-// release-operator last auto-deployed (status.autoDeploy.deployedVersion) —
-// empty until the first CI build has been deployed.
-export function effectiveVersion(release: ReleaseCustomResource): string {
-  if (isAutoDeploy(release)) {
-    return release.status?.autoDeploy?.deployedVersion ?? '';
-  }
-  return release.spec?.version ?? '';
+  return Boolean(release.spec?.autoDeploy?.branch);
 }
 
 export interface MapperError {
@@ -93,7 +85,7 @@ export function mapReleaseToVersion(
   // version is display-only and intentionally shown as-is — see
   // BACKSTAGE_PART5.md Step 2: "latest" is never resolved to a concrete
   // SHA/tag/digest here.
-  const version = effectiveVersion(release);
+  const version = release.spec?.version ?? '';
 
   return { environment, version, releaseName: crName, autoDeploy: isAutoDeploy(release) };
 }

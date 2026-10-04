@@ -80,7 +80,7 @@ spec:
   );
 });
 
-test('renders an auto-deploy Release with autoDeploy instead of a version', () => {
+test('turning auto-deploy on renders autoDeploy.branch and leaves version to release-operator', () => {
   assert.equal(
     render({ componentName: 'orders', environment: 'dev', autoDeploy: true, bindings: {} }),
     `apiVersion: platform.taskapp.io/v1alpha1
@@ -94,7 +94,7 @@ spec:
     name: orders
   environment: dev
   autoDeploy:
-    enabled: true
+    branch: main
 `,
   );
 });
@@ -113,7 +113,7 @@ spec:
     name: orders
   environment: dev
   autoDeploy:
-    enabled: true
+    branch: main
   bindings:
     database:
       enabled: true

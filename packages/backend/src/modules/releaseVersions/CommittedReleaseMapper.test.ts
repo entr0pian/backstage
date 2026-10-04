@@ -18,9 +18,26 @@ spec:
     name: orders
   environment: dev
   autoDeploy:
-    enabled: true
+    branch: main
 `),
     ).toEqual({ exists: true, autoDeploy: true, version: null, bindings: {} });
+  });
+
+  it('keeps the version release-operator committed to an auto-deploy Release', () => {
+    expect(
+      parseCommittedRelease(`apiVersion: platform.taskapp.io/v1alpha1
+kind: Release
+metadata:
+  name: orders-dev
+spec:
+  componentRef:
+    name: orders
+  environment: dev
+  version: "${SHA}"
+  autoDeploy:
+    branch: main
+`),
+    ).toEqual({ exists: true, autoDeploy: true, version: SHA, bindings: {} });
   });
 
   it('reads a pinned Release with its enabled bindings', () => {

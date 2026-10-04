@@ -70,7 +70,7 @@ test('invalid names are rejected', () => {
   }
 });
 
-// "Set up auto deployment to dev": the extra dev Release this template adds.
+// "Set up auto deployment to <env>": the extra Release this template adds.
 function renderRelease(values) {
   const source = readFileSync(join(here, 'release', 'release.yaml'), 'utf8');
   return source.replace(/\$\{\{\s*values\.(\w+)\s*\}\}/g, (_, key) => {
@@ -81,7 +81,7 @@ function renderRelease(values) {
   });
 }
 
-test('renders the auto-deploy dev Release: no version, no bindings', () => {
+test('renders the auto-deploy Release: follows main, no version, no bindings', () => {
   assert.equal(
     renderRelease({ name: 'order-service', environment: 'dev' }),
     `apiVersion: platform.taskapp.io/v1alpha1
@@ -95,14 +95,17 @@ spec:
     name: order-service
   environment: dev
   autoDeploy:
-    enabled: true
+    branch: main
 `,
   );
 });
 
-test('the dev Release has the name and file Create deployment uses for it', () => {
+test('the Release has the name and file Create deployment uses for it', () => {
   const template = readFileSync(join(here, 'template.yaml'), 'utf8');
-  assert.match(template, /to: platform\/environments\/dev\/\$\{\{ parameters\.name \}\}-release\.yaml/);
+  assert.match(
+    template,
+    /to: platform\/environments\/\$\{\{ parameters\.autoDeploy\.environment \}\}\/\$\{\{ parameters\.name \}\}-release\.yaml/,
+  );
   const createDeployment = readFileSync(join(here, '..', 'create-deployment', 'template.yaml'), 'utf8');
   assert.match(
     createDeployment,
@@ -110,4 +113,10 @@ test('the dev Release has the name and file Create deployment uses for it', () =
   );
   const createSkeleton = readFileSync(join(here, '..', 'create-deployment', 'skeleton', 'release.yaml'), 'utf8');
   assert.match(createSkeleton, /name: \$\{\{ values\.componentName \}\}-\$\{\{ values\.environment \}\}/);
+});
+
+test('auto deployment is on by default, with its environment from config rather than hardcoded', () => {
+  const template = readFileSync(join(here, 'template.yaml'), 'utf8');
+  assert.match(template, /autoDeploy:\n\s+title: Auto deployment[\s\S]*?default:\n\s+enabled: true\n\s+ui:field: PlatformAutoDeploySetup/);
+  assert.doesNotMatch(template, /platform\/environments\/dev\//);
 });

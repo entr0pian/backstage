@@ -379,7 +379,7 @@ environment files, Argo CD syncs them
     cluster is a values change, not an image rebuild. `app-config.yaml`
     keeps a `[management]` default for local runs.
   - `PlatformAutoDeployToggle`: whether the Release follows `main`
-    (`autoDeploy.enabled: true`, no `version`) instead of a pinned version;
+    (`autoDeploy: {branch: main}`) instead of a pinned version;
     see **Auto-deploy** below.
   - `PlatformVersionPicker`: commits on the component repo's `main` whose
     `ci.yaml` push run succeeded. CI only pushes an image, tagged with the
@@ -402,9 +402,11 @@ environment files, Argo CD syncs them
 ### Auto-deploy
 
 A dev Release can follow `main` instead of a pinned version: release-operator
-polls the component's `ci.yaml` runs and commits every new successful build
-straight to `application-repositories` (no PR per deploy). See
-`docs/AUTO_DEPLOY.md` in `release-operator` for the full design.
+polls the component's `ci.yaml` runs and, for every newer successful build,
+commits its SHA as `version:` to the Release file in `application-repositories`
+(no PR per deploy). Argo CD applies that file like any other change, and the
+deploy then runs the usual way. See `docs/AUTO_DEPLOY.md` in `release-operator`
+for the full design.
 
 - **Where**: `platform.autoDeployEnvironments` (default `[dev]`). Elsewhere
   the toggle is greyed out and off. release-operator enforces the same list
@@ -415,15 +417,18 @@ straight to `application-repositories` (no PR per deploy). See
   (`CommittedRelease*`), never a default.
 - **On**: the Version picker is greyed out and cleared; the PR
   (`Enable auto-deploy for <component> in dev`, branch
-  `backstage/deploy-<component>-dev-auto`) writes `autoDeploy.enabled: true`
-  in place of `version`. **Off**: a version is required again and the PR
-  pins it.
-- **Onboard Service**: the "Set up auto deployment to dev" checkbox adds that
-  same Release file (auto-deploy on, no bindings) to the onboarding PR.
+  `backstage/deploy-<component>-dev-auto`) writes `autoDeploy: {branch: main}`
+  and no `version`; release-operator sets it to the newest build. **Off**: a
+  version is required again and the PR pins it.
+- **Onboard Service**: "Set up auto deployment to <env>" (`PlatformAutoDeploySetup`,
+  on by default; `<env>` is the first of `platform.autoDeployEnvironments`)
+  adds that same Release file (auto-deploy on, no version, no bindings) to the
+  onboarding PR.
 - **Deployments card**: an auto-deploy environment shows an **Auto-deploy**
   badge and no **Rollback** button: the next build on `main` would deploy
   straight over it. Revert on `main`, or turn Auto-deploy off and pin a
-  version. Its version is `status.autoDeploy.deployedVersion`.
+  version. Its version is `spec.version`, as for any Release (empty until the
+  first build).
 
 ### Testing the flow
 

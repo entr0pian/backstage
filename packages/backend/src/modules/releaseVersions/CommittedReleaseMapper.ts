@@ -8,7 +8,7 @@ export interface CommittedRelease {
   // false: no Release file for this component/environment on main yet.
   exists: boolean;
   autoDeploy: boolean;
-  // spec.version when pinned; null for an auto-deploy Release or none.
+  // spec.version; null before an auto-deploy Release's first build.
   version: string | null;
   // binding type -> referenced resource, only the enabled ones.
   bindings: Record<string, string>;
@@ -35,7 +35,7 @@ interface ReleaseManifest {
   kind?: unknown;
   spec?: {
     version?: unknown;
-    autoDeploy?: { enabled?: unknown } | null;
+    autoDeploy?: { branch?: unknown } | null;
     bindings?: Record<string, { enabled?: unknown; ref?: unknown } | null> | null;
   } | null;
 }
@@ -60,11 +60,11 @@ export function parseCommittedRelease(text: string | null): CommittedRelease {
       bindings[type] = binding.ref;
     }
   }
-  const autoDeploy = spec.autoDeploy?.enabled === true;
+  const branch = spec.autoDeploy?.branch;
   return {
     exists: true,
-    autoDeploy,
-    version: !autoDeploy && typeof spec.version === 'string' && spec.version ? spec.version : null,
+    autoDeploy: typeof branch === 'string' && branch !== '',
+    version: typeof spec.version === 'string' && spec.version ? spec.version : null,
     bindings,
   };
 }

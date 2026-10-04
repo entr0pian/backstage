@@ -9,4 +9,4 @@ spec:
     name: ${{ values.name }}
   environment: ${{ values.environment }}
   autoDeploy:
-    enabled: true
+    branch: main

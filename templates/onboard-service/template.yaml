@@ -51,14 +51,18 @@ spec:
           description: Latest by default; pick an older one only to pin it.
           pattern: '^\d+\.\d+\.\d+$'
           ui:field: PlatformScaffoldVersionPicker
-        setupAutoDeploy:
-          title: Set up auto deployment to dev
-          type: boolean
+        autoDeploy:
+          title: Auto deployment
+          type: object
           description: >-
-            Also add a dev Release that deploys every successful build on
-            main, with no PR per deploy. Turn it off later with Create
+            Also add a Release that follows main: every successful build
+            deploys, with no PR per deploy. Turn it off later with Create
             deployment.
-          default: false
+          # The field fills in environment: the first of
+          # platform.autoDeployEnvironments (app-config).
+          default:
+            enabled: true
+          ui:field: PlatformAutoDeploySetup
 
   steps:
     - id: render-component
@@ -85,31 +89,31 @@ spec:
           - from: platform/registry/component.yaml
             to: platform/registry/${{ parameters.name }}.yaml
 
-    # Optional: the dev Release with auto-deploy on, no version and no
+    # On by default: a Release following main, with no version and no
     # bindings, at the same path and name Create deployment uses — so
     # Create deployment later shows it as committed and edits this file.
     # The Component's repository doesn't exist until this PR merges;
-    # release-operator waits (AwaitingFirstBuild) until its first CI run
-    # on main succeeds, then deploys it.
+    # release-operator waits (WaitingForFirstBuild) until the first CI run
+    # on main succeeds, then commits that build's version to this file.
     - id: render-release
-      name: Render dev Release (auto-deploy)
-      if: ${{ parameters.setupAutoDeploy }}
+      name: Render auto-deploy Release
+      if: ${{ parameters.autoDeploy.enabled and parameters.autoDeploy.environment }}
       action: fetch:template
       input:
         url: ./release
-        targetPath: platform/environments/dev
+        targetPath: platform/environments/${{ parameters.autoDeploy.environment }}
         values:
           name: ${{ parameters.name }}
-          environment: dev
+          environment: ${{ parameters.autoDeploy.environment }}
 
     - id: rename-release
       name: Rename to <name>-release.yaml
-      if: ${{ parameters.setupAutoDeploy }}
+      if: ${{ parameters.autoDeploy.enabled and parameters.autoDeploy.environment }}
       action: fs:rename
       input:
         files:
-          - from: platform/environments/dev/release.yaml
-            to: platform/environments/dev/${{ parameters.name }}-release.yaml
+          - from: platform/environments/${{ parameters.autoDeploy.environment }}/release.yaml
+            to: platform/environments/${{ parameters.autoDeploy.environment }}/${{ parameters.name }}-release.yaml
 
     - id: open-pr
       name: Open pull request
@@ -128,10 +132,10 @@ spec:
           | Repository visibility | `${{ parameters.visibility }}` |
           | Scaffold template | `${{ parameters.scaffoldTemplate }}` |
           | Scaffold version | `${{ parameters.scaffoldVersion }}` |
-          | Auto-deploy to dev | ${{ 'yes: every successful build on `main`' if parameters.setupAutoDeploy else 'no' }} |
+          | Auto-deploy | ${{ ('to `' + parameters.autoDeploy.environment + '`: every successful build on `main`') if (parameters.autoDeploy.enabled and parameters.autoDeploy.environment) else 'no' }} |
 
           Generated through Backstage's **Onboard Service** template. Adds
-          `platform/registry/${{ parameters.name }}.yaml`${{ (' and `platform/environments/dev/' + parameters.name + '-release.yaml`') if parameters.setupAutoDeploy else '' }}.
+          `platform/registry/${{ parameters.name }}.yaml`${{ (' and `platform/environments/' + parameters.autoDeploy.environment + '/' + parameters.name + '-release.yaml`') if (parameters.autoDeploy.enabled and parameters.autoDeploy.environment) else '' }}.
 
   output:
     links:

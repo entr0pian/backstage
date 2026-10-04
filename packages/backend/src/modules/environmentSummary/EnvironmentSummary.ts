@@ -123,8 +123,7 @@ export interface K8sEvent {
 export interface ReleaseForSummary {
   name: string;
   namespace: string;
-  // spec.version, or status.autoDeploy.deployedVersion for an auto-deploy
-  // Release (effectiveVersion).
+  // Empty for an auto-deploy Release before its first build.
   version: string;
   autoDeploy: boolean;
   bindings: Record<string, { enabled?: boolean; ref?: string } | undefined>;

@@ -118,11 +118,11 @@ describe('releaseVersionsForComponent', () => {
 });
 
 describe('auto-deploy Releases', () => {
-  it('reports the version release-operator deployed, not an empty spec.version', () => {
+  it('reports spec.version, which release-operator keeps current in git', () => {
     const result = mapReleaseToVersion({
       metadata: { name: 'payments-dev', namespace: 'dev' },
-      spec: { componentRef: { name: 'payments' }, environment: 'dev', autoDeploy: { enabled: true } },
-      status: { autoDeploy: { deployedVersion: 'a'.repeat(40), runNumber: 7 } },
+      spec: { componentRef: { name: 'payments' }, environment: 'dev', version: 'a'.repeat(40), autoDeploy: { branch: 'main' } },
+      status: { autoDeploy: { branch: 'main', latestDeployable: 'b'.repeat(40), reason: 'Deploying' } },
     });
     expect(result).toEqual({
       environment: 'dev',
@@ -132,10 +132,10 @@ describe('auto-deploy Releases', () => {
     });
   });
 
-  it('has an empty version until the first build has been deployed', () => {
+  it('has an empty version until the first build has been committed', () => {
     const result = mapReleaseToVersion({
       metadata: { name: 'payments-dev', namespace: 'dev' },
-      spec: { componentRef: { name: 'payments' }, environment: 'dev', autoDeploy: { enabled: true } },
+      spec: { componentRef: { name: 'payments' }, environment: 'dev', autoDeploy: { branch: 'main' } },
     });
     expect(result).toEqual({ environment: 'dev', version: '', releaseName: 'payments-dev', autoDeploy: true });
   });
