@@ -378,6 +378,9 @@ environment files, Argo CD syncs them
     `application-repositories` `values/backstage/management.yaml`), so a new
     cluster is a values change, not an image rebuild. `app-config.yaml`
     keeps a `[management]` default for local runs.
+  - `PlatformAutoDeployToggle`: whether the Release follows `main`
+    (`autoDeploy.enabled: true`, no `version`) instead of a pinned version;
+    see **Auto-deploy** below.
   - `PlatformVersionPicker`: commits on the component repo's `main` whose
     `ci.yaml` push run succeeded. CI only pushes an image, tagged with the
     full commit SHA, from those runs. Each entry shows the short SHA, commit
@@ -396,10 +399,37 @@ environment files, Argo CD syncs them
     `bindings.database: { enabled: true, ref }`, since a Release binds at
     most one database.
 
+### Auto-deploy
+
+A dev Release can follow `main` instead of a pinned version: release-operator
+polls the component's `ci.yaml` runs and commits every new successful build
+straight to `application-repositories` (no PR per deploy). See
+`docs/AUTO_DEPLOY.md` in `release-operator` for the full design.
+
+- **Where**: `platform.autoDeployEnvironments` (default `[dev]`). Elsewhere
+  the toggle is greyed out and off. release-operator enforces the same list
+  with `--auto-deploy-environments`, so keep the two in step.
+- **Starts from git**: in dev the toggle starts as what's committed in
+  `platform/environments/dev/<component>-release.yaml`, read by
+  `GET /api/platform/committed-releases/:component/:environment`
+  (`CommittedRelease*`), never a default.
+- **On**: the Version picker is greyed out and cleared; the PR
+  (`Enable auto-deploy for <component> in dev`, branch
+  `backstage/deploy-<component>-dev-auto`) writes `autoDeploy.enabled: true`
+  in place of `version`. **Off**: a version is required again and the PR
+  pins it.
+- **Onboard Service**: the "Set up auto deployment to dev" checkbox adds that
+  same Release file (auto-deploy on, no bindings) to the onboarding PR.
+- **Deployments card**: an auto-deploy environment shows an **Auto-deploy**
+  badge and no **Rollback** button: the next build on `main` would deploy
+  straight over it. Revert on `main`, or turn Auto-deploy off and pin a
+  version. Its version is `status.autoDeploy.deployedVersion`.
+
 ### Testing the flow
 
 - **Template rendering**:
-  `node --test templates/create-deployment/render.test.mjs`
+  `node --test templates/create-deployment/render.test.mjs` and
+  `node --test templates/onboard-service/render.test.mjs`
 - **Unit tests**:
   `yarn backstage-cli repo test packages/app/src/modules/createDeployment packages/app/src/modules/platformActions packages/backend/src/modules/releaseVersions`
 - **End-to-end** (deployed instance): open a service's Catalog page and
