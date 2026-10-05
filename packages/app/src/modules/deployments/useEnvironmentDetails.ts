@@ -81,6 +81,15 @@ export interface EnvironmentDetails {
       notReadyEndpoints: number;
       createdAt: string | null;
     }[];
+    // One per Ingress host; address is null until the load balancer exists.
+    ingresses: {
+      name: string;
+      namespace: string;
+      host: string;
+      url: string;
+      address: string | null;
+      createdAt: string | null;
+    }[];
   };
   bindings: {
     name: string;

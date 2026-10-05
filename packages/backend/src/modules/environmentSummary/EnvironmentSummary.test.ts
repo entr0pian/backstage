@@ -68,6 +68,7 @@ function paymentsObjects(overrides: Partial<EnvironmentObjects> = {}): Environme
     endpointSlices: {
       'management/payments': [{ endpoints: [{ conditions: { ready: true } }] }],
     },
+    ingresses: [],
     externalSecrets: [
       {
         metadata: {
@@ -346,6 +347,47 @@ describe('buildEnvironmentSummary', () => {
     expect(s.progress.phase).toBe('Healthy');
   });
 
+  it('reports the public URL from the Ingress, https when the ALB listens on 443', () => {
+    const objects = paymentsObjects({
+      ingresses: [
+        {
+          metadata: {
+            name: 'payments',
+            namespace: 'dev',
+            annotations: { 'alb.ingress.kubernetes.io/listen-ports': '[{"HTTP": 80}, {"HTTPS": 443}]' },
+            creationTimestamp: new Date('2026-10-05T14:20:00Z'),
+          },
+          spec: { rules: [{ host: 'payments.dev.gerodimos.dev' }] },
+          status: { loadBalancer: { ingress: [{ hostname: 'k8s-dev-abc.eu-west-1.elb.amazonaws.com' }] } },
+        },
+        {
+          // Created, but the load balancer isn't provisioned yet.
+          metadata: { name: 'internal', namespace: 'dev' },
+          spec: { rules: [{ host: 'internal.example' }, { host: 'internal.example' }, {}] },
+        },
+      ],
+    });
+    const s = buildEnvironmentSummary('payments', 'dev', objects, { includeSensitive: false, now: NOW });
+    expect(s.networking.ingresses).toEqual([
+      {
+        name: 'payments',
+        namespace: 'dev',
+        host: 'payments.dev.gerodimos.dev',
+        url: 'https://payments.dev.gerodimos.dev',
+        address: 'k8s-dev-abc.eu-west-1.elb.amazonaws.com',
+        createdAt: '2026-10-05T14:20:00.000Z',
+      },
+      {
+        name: 'internal',
+        namespace: 'dev',
+        host: 'internal.example',
+        url: 'http://internal.example',
+        address: null,
+        createdAt: null,
+      },
+    ]);
+  });
+
   it('handles an environment with a Release but nothing running yet', () => {
     const s = buildEnvironmentSummary(
       'payments',
@@ -365,6 +407,7 @@ describe('buildEnvironmentSummary', () => {
         pods: [],
         services: [],
         endpointSlices: {},
+        ingresses: [],
         externalSecrets: [],
         events: [],
       },

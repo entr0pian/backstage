@@ -92,6 +92,12 @@ export interface K8sEndpointSlice {
   endpoints?: { conditions?: { ready?: boolean } }[];
 }
 
+export interface K8sIngress {
+  metadata?: K8sMeta & { annotations?: Record<string, string> };
+  spec?: { tls?: { hosts?: string[] }[]; rules?: { host?: string }[] };
+  status?: { loadBalancer?: { ingress?: { hostname?: string; ip?: string }[] } };
+}
+
 export interface K8sCondition {
   type?: string;
   status?: string;
@@ -142,6 +148,7 @@ export interface EnvironmentObjects {
   services: K8sService[];
   // keyed by "<namespace>/<service name>"
   endpointSlices: Record<string, K8sEndpointSlice[]>;
+  ingresses: K8sIngress[];
   externalSecrets: K8sExternalSecret[];
   events: K8sEvent[];
 }
@@ -224,6 +231,8 @@ export interface EnvironmentSummary {
       notReadyEndpoints: number;
       createdAt: string | null;
     }[];
+    // Public URLs: one entry per Ingress host.
+    ingresses: IngressSummary[];
   };
   bindings: BindingSummary[];
   warnings: WarningSummary[];
@@ -233,6 +242,43 @@ export interface EnvironmentSummary {
 }
 
 // --- logic ----------------------------------------------------------------
+
+export interface IngressSummary {
+  name: string;
+  namespace: string;
+  host: string;
+  url: string;
+  // The load balancer's address; null while it's still being provisioned.
+  address: string | null;
+  createdAt: string | null;
+}
+
+// An Ingress serves HTTPS when it declares TLS, or (AWS Load Balancer
+// Controller) listens on 443 with the certificate found in ACM by host.
+function servesHttps(ing: K8sIngress, host: string): boolean {
+  if ((ing.spec?.tls ?? []).some(t => (t.hosts ?? []).includes(host))) {
+    return true;
+  }
+  return (ing.metadata?.annotations?.['alb.ingress.kubernetes.io/listen-ports'] ?? '').includes('HTTPS');
+}
+
+function toIngressSummaries(ing: K8sIngress): IngressSummary[] {
+  const name = ing.metadata?.name;
+  const namespace = ing.metadata?.namespace;
+  if (!name || !namespace) {
+    return [];
+  }
+  const lb = ing.status?.loadBalancer?.ingress?.[0];
+  const hosts = [...new Set((ing.spec?.rules ?? []).map(r => r.host).filter((h): h is string => !!h))];
+  return hosts.map(host => ({
+    name,
+    namespace,
+    host,
+    url: `${servesHttps(ing, host) ? 'https' : 'http'}://${host}`,
+    address: lb?.hostname ?? lb?.ip ?? null,
+    createdAt: iso(ing.metadata?.creationTimestamp),
+  }));
+}
 
 export const BINDING_LABEL = 'platform.taskapp.io/binding';
 export const BINDING_ROOT = '/bindings';
@@ -562,6 +608,7 @@ export function buildEnvironmentSummary(
             createdAt: iso(s.metadata?.creationTimestamp),
           };
         }),
+      ingresses: objects.ingresses.flatMap(toIngressSummaries),
     },
     bindings: buildBindings(release, objects.externalSecrets, includeSensitive),
     warnings: buildWarnings(objects, now, includeSensitive),

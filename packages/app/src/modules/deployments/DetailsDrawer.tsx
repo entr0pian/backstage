@@ -330,7 +330,21 @@ const ResourcesPanel = ({
                 <td className={classes.muted}>{age(svc.createdAt)}</td>
               </tr>
             ))}
-            {!dep && workload.pods.length === 0 && networking.services.length === 0 && (
+            {networking.ingresses.map(ing => (
+              <tr key={`${ing.namespace}/${ing.name}/${ing.host}`}>
+                <td>Ingress</td>
+                <td className={classes.name}>{ing.name}</td>
+                <td>
+                  <Dot tone={ing.address ? 'good' : 'warn'} />
+                  {ing.address ? 'Load balancer ready' : 'Provisioning'}
+                </td>
+                <td className={classes.muted}>
+                  <Link to={ing.url}>{ing.host}</Link>
+                </td>
+                <td className={classes.muted}>{age(ing.createdAt)}</td>
+              </tr>
+            ))}
+            {!dep && workload.pods.length === 0 && networking.services.length === 0 && networking.ingresses.length === 0 && (
               <tr>
                 <td colSpan={5} className={classes.muted}>
                   Nothing found for this environment. Resources are found by their platform.taskapp.io labels.
@@ -360,9 +374,19 @@ const NetworkingPanel = ({ details }: { details: EnvironmentDetails }) => {
           {svc.notReadyEndpoints > 0 ? `, ${svc.notReadyEndpoints} not ready` : ''}
         </Typography>
       ))}
-      <Typography className={classes.line}>
-        <span className={classes.muted}>No external URL yet — ingress isn't configured for this environment.</span>
-      </Typography>
+      {details.networking.ingresses.map(ing => (
+        <Typography key={`${ing.namespace}/${ing.name}/${ing.host}`} className={classes.line} component="div">
+          Public URL <Link to={ing.url}>{ing.url}</Link>
+          {!ing.address && (
+            <span className={classes.muted}> — the load balancer is still being provisioned</span>
+          )}
+        </Typography>
+      ))}
+      {details.networking.ingresses.length === 0 && (
+        <Typography className={classes.line}>
+          <span className={classes.muted}>No public URL — the component has no Ingress in this environment.</span>
+        </Typography>
+      )}
     </Panel>
   );
 };

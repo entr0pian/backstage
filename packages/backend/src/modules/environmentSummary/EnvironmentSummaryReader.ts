@@ -3,6 +3,7 @@ import {
   CoreV1Api,
   CustomObjectsApi,
   DiscoveryV1Api,
+  NetworkingV1Api,
 } from '@kubernetes/client-node';
 import type { LoggerService } from '@backstage/backend-plugin-api';
 import type { ReleaseVersionReader } from '../releaseVersions/ReleaseVersionReader';
@@ -14,6 +15,7 @@ import type {
   K8sEndpointSlice,
   K8sEvent,
   K8sExternalSecret,
+  K8sIngress,
   K8sPod,
   K8sReplicaSet,
   K8sService,
@@ -78,6 +80,7 @@ export class EnvironmentSummaryReader {
         pods: [],
         services: [],
         endpointSlices: {},
+        ingresses: [],
         externalSecrets: [],
         events: [],
       };
@@ -87,11 +90,12 @@ export class EnvironmentSummaryReader {
     const core = kubeConfig.makeApiClient(CoreV1Api);
     const apps = kubeConfig.makeApiClient(AppsV1Api);
     const discovery = kubeConfig.makeApiClient(DiscoveryV1Api);
+    const networking = kubeConfig.makeApiClient(NetworkingV1Api);
     const custom = kubeConfig.makeApiClient(CustomObjectsApi);
 
     const labelSelector = `platform.taskapp.io/component=${component},platform.taskapp.io/environment=${environment}`;
 
-    const [release, deploymentsRead, replicaSetsRead, podsRead, services, externalSecrets] = await Promise.all([
+    const [release, deploymentsRead, replicaSetsRead, podsRead, services, ingresses, externalSecrets] = await Promise.all([
       releasePromise,
       this.required('deployments', async () =>
         (await apps.listDeploymentForAllNamespaces({ labelSelector })).items as K8sDeployment[],
@@ -104,6 +108,9 @@ export class EnvironmentSummaryReader {
       ),
       this.attempt('services', [] as K8sService[], async () =>
         (await core.listServiceForAllNamespaces({ labelSelector })).items as K8sService[],
+      ),
+      this.attempt('ingresses', [] as K8sIngress[], async () =>
+        (await networking.listIngressForAllNamespaces({ labelSelector })).items as K8sIngress[],
       ),
       this.attempt('externalsecrets', [] as K8sExternalSecret[], async () => {
         const res = await custom.listClusterCustomObject({
@@ -161,6 +168,7 @@ export class EnvironmentSummaryReader {
       pods,
       services,
       endpointSlices,
+      ingresses,
       externalSecrets,
       events,
     };
