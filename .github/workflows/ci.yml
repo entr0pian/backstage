@@ -88,3 +88,19 @@ jobs:
           tags: |
             ${{ env.IMAGE }}:latest
             ${{ env.IMAGE }}:${{ github.sha }}
+
+  # Deploys this commit to management: application-repositories'
+  # bump-infra.yml pins infra/backstage's chart and image to it. No secrets
+  # here; that workflow gets its credentials through this job's OIDC token.
+  # Set the repo variable AUTO_DEPLOY=false to stop it.
+  deploy:
+    name: Deploy to management
+    needs: [test, docker-build-push]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.AUTO_DEPLOY != 'false'
+    permissions:
+      contents: read
+      id-token: write
+    uses: entr0pian/application-repositories/.github/workflows/bump-infra.yml@main
+    with:
+      component: backstage
+      sha: ${{ github.sha }}
