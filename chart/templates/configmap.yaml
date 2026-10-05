@@ -6,7 +6,7 @@ metadata:
     app: {{ .Chart.Name }}
 data:
   # Layered on top of app-config.yaml + app-config.production.yaml (see
-  # deployment.yaml's args). Three jobs:
+  # deployment.yaml's args). Its jobs:
   #   1. Cancel app-config.production.yaml's `database.client: pg` — we
   #      haven't wired up Postgres yet (see backstage/README.md), so this
   #      keeps the in-memory sqlite default instead of crashing on missing
@@ -23,6 +23,12 @@ data:
   #      GitHub sign-in. usernameMatchingUserEntityName only admits a
   #      GitHub user with a matching User entity (org-data/users.yaml), so
   #      no other GitHub account can sign in at all.
+  #   5. When Values.githubApp.secretPath is set, authenticate to GitHub as
+  #      that App instead of app-config.yaml's GITHUB_TOKEN PAT. Config
+  #      arrays replace rather than merge, so this github entry is the only
+  #      one. Backstage mints and refreshes installation tokens itself; the
+  #      scaffolder, catalog discovery and the custom GitHub readers pick
+  #      them up through the integration with no code change.
   app-config.cluster.yaml: |
     auth:
       environment: production
@@ -38,6 +44,17 @@ data:
               resolvers:
                 - resolver: usernameMatchingUserEntityName
         {{- end }}
+    {{- if .Values.githubApp.secretPath }}
+    integrations:
+      github:
+        - host: github.com
+          apps:
+            - appId: ${GITHUB_APP_ID}
+              clientId: ${GITHUB_APP_CLIENT_ID}
+              clientSecret: ${GITHUB_APP_CLIENT_SECRET}
+              privateKey: ${GITHUB_APP_PRIVATE_KEY}
+              allowedInstallationOwners: {{ .Values.githubApp.allowedInstallationOwners | toJson }}
+    {{- end }}
     backend:
       database:
         client: better-sqlite3

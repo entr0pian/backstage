@@ -127,6 +127,7 @@ spec:
 
           | Field | Value |
           |---|---|
+          | Requested by | `${{ user.ref }}` |
           | Component | `${{ parameters.name }}` |
           | Owner | `${{ parameters.owner }}` |
           | Repository visibility | `${{ parameters.visibility }}` |

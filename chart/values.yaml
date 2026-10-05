@@ -34,8 +34,24 @@ github:
   # namespace too since a Kubernetes Secret can't be mounted cross-namespace.
   # Expected JSON format: {"token": "<value>", "owner": "<github org or user>"}
   # Leave empty to skip creating the ExternalSecret — the GitHub catalog
-  # integration and the Onboard Service template's PR step won't work without it.
+  # integration and the Onboard Service template's PR step won't work without
+  # it (or githubApp.secretPath, which replaces it).
   secretPath: ""
+  clusterSecretStoreName: aws-secrets-manager
+
+githubApp:
+  # Path to the secret in AWS Secrets Manager holding the GitHub App
+  # (taskapp-platform-portal) Backstage authenticates as: PRs, catalog
+  # discovery and the custom GitHub readers all go through it, as
+  # short-lived installation tokens. bootstrap-cluster/terraform/
+  # management-eks creates the secret (portal_github_app); its value is set
+  # by hand. Takes precedence over github.secretPath when both are set.
+  # Expected JSON format:
+  #   {"appId": "<n>", "clientId": "<Iv..>", "clientSecret": "<value>", "privateKey": "<PEM>"}
+  secretPath: ""
+  # GitHub account the App is installed on; Backstage only uses installations
+  # owned by these.
+  allowedInstallationOwners: [entr0pian]
   clusterSecretStoreName: aws-secrets-manager
 
 argocd:

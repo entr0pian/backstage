@@ -73,6 +73,13 @@ variable, read at startup (never commit the token itself):
 |---|---|
 | `GITHUB_TOKEN` | PAT (or GitHub App token) with `contents:write` + `pull_requests:write` on `entr0pian/application-repositories`, used by both the catalog GitHub integration and the scaffolder's `publish:github:pull-request` action |
 
+`GITHUB_TOKEN` is for running locally. The deployed instance never uses a
+PAT: it authenticates as the `taskapp-platform-portal` GitHub App (chart
+value `githubApp.secretPath`), so PRs are opened by
+`taskapp-platform-portal[bot]` with short-lived installation tokens, and each
+PR's table records who requested it. The chart still accepts a PAT through
+`github.secretPath`, but only when no App is configured.
+
 ### Running locally
 
 ```sh

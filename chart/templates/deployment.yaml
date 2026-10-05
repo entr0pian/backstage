@@ -37,7 +37,28 @@ spec:
         - name: BACKSTAGE_BASE_URL
           value: {{ .Values.baseUrl | quote }}
         {{- end }}
-        {{- if .Values.github.secretPath }}
+        {{- if .Values.githubApp.secretPath }}
+        - name: GITHUB_APP_ID
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Release.Name }}-github-app
+              key: appId
+        - name: GITHUB_APP_CLIENT_ID
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Release.Name }}-github-app
+              key: clientId
+        - name: GITHUB_APP_CLIENT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Release.Name }}-github-app
+              key: clientSecret
+        - name: GITHUB_APP_PRIVATE_KEY
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Release.Name }}-github-app
+              key: privateKey
+        {{- else if .Values.github.secretPath }}
         - name: GITHUB_TOKEN
           valueFrom:
             secretKeyRef:

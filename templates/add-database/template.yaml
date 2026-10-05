@@ -79,6 +79,7 @@ spec:
 
           | Field | Value |
           |---|---|
+          | Requested by | `${{ user.ref }}` |
           | Component | `${{ parameters.componentName }}` |
           | Environment | `${{ parameters.environment }}` |
           | Database | `${{ parameters.dbName }}` |
