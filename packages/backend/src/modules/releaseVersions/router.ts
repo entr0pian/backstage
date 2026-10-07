@@ -18,7 +18,7 @@ import type { ScaffoldVersionReader } from '../scaffoldVersions/ScaffoldVersionR
 import { isValidScaffoldName } from '../scaffoldVersions/ScaffoldVersionMapper';
 import type { SchemaReader } from '../schemaSummary/SchemaReader';
 import type { SchemaRepositoryReader } from '../schemaSummary/SchemaRepositoryReader';
-import { buildSchemaSummary } from '../schemaSummary/SchemaSummary';
+import { buildSchemaSummary, codeSchemaCheck, type CodeSchemaCheck } from '../schemaSummary/SchemaSummary';
 
 const COMMIT_SHA = /^[0-9a-f]{40}$/;
 
@@ -164,10 +164,13 @@ export function createRouter(options: {
     res.json({ component, repository: result.repository, versions: result.versions });
   });
 
-  // GET /api/platform/schemas/:component/:environment -> { component,
-  // environment, committedVersion, requested, applied }: the DatabaseSchema
-  // committed in git (what the form starts from), the one on management, and
-  // the AtlasMigration on the workload cluster (whether it was applied).
+  // GET /api/platform/schemas/:component/:environment[?committed=1] ->
+  // { component, environment, requested, applied, code[, committedVersion] }:
+  // the DatabaseSchema on management, the AtlasMigration on the workload
+  // cluster (whether it was applied), and whether the code the Release
+  // deploys expects a migration the database doesn't have yet. With
+  // committed=1 (the Apply database schema form), also the DatabaseSchema
+  // version committed in git; the polling deployment card leaves it out.
   // Atlas's condition messages (the failing SQL and database error) are
   // owner-only, decided here like the environment summary's.
   router.get('/schemas/:component/:environment', async (req, res) => {
@@ -177,15 +180,33 @@ export function createRouter(options: {
       return;
     }
     const includeSensitive = await mayReadSensitive(req);
-    const [committedVersion, objects] = await Promise.all([
-      schemaRepos.committedVersion(component, environment),
+    const credentials = await httpAuth.credentials(req);
+    const [committedVersion, objects, releases] = await Promise.all([
+      req.query.committed ? schemaRepos.committedVersion(component, environment) : Promise.resolve(undefined),
       schemas.read(component, environment),
+      reader.listAll(),
     ]);
+    const summary = buildSchemaSummary(objects.databaseSchema, objects.atlasMigration, { includeSensitive });
+
+    let code: CodeSchemaCheck | null = null;
+    const release = releases.find(
+      r => r.spec?.componentRef?.name === component && r.spec?.environment === environment,
+    );
+    const version = release?.spec?.version;
+    if (version && COMMIT_SHA.test(version) && (summary.requested || summary.applied)) {
+      try {
+        const files = await schemaRepos.migrationsAt(component, version, credentials);
+        code = files ? codeSchemaCheck(version, files, summary.applied) : null;
+      } catch {
+        code = null; // GitHub unavailable: no warning rather than a wrong one
+      }
+    }
     res.json({
       component,
       environment,
-      committedVersion,
-      ...buildSchemaSummary(objects.databaseSchema, objects.atlasMigration, { includeSensitive }),
+      ...(committedVersion !== undefined ? { committedVersion } : {}),
+      ...summary,
+      code,
     });
   });
 

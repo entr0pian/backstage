@@ -24,6 +24,12 @@ export type MigrationChangesResult =
 // files in a component's repository, and the DatabaseSchema committed in
 // application-repositories.
 export class SchemaRepositoryReader {
+  // A commit's migrations/ never changes, so listings are kept: the
+  // deployment card polls, and should cost one GitHub call per version, not
+  // per poll. Bounded, oldest dropped first.
+  private readonly listings = new Map<string, string[]>();
+  private static readonly MAX_LISTINGS = 200;
+
   constructor(
     private readonly catalog: CatalogService,
     private readonly githubCredentials: GithubCredentialsProvider,
@@ -76,11 +82,23 @@ export class SchemaRepositoryReader {
   // order; empty when there is no migrations/ directory. For the deployment
   // card's code-ahead-of-schema warning.
   async migrationsAt(component: string, ref: string, credentials: BackstageCredentials): Promise<string[] | null> {
+    const key = `${component}@${ref}`;
+    const cached = this.listings.get(key);
+    if (cached) {
+      return cached;
+    }
     const repo = await this.repoOf(component, credentials);
     if (!repo) {
       return null;
     }
-    return this.migrationNames(repo, ref, `https://github.com/${repo.owner}/${repo.repo}`);
+    const names = await this.migrationNames(repo, ref, `https://github.com/${repo.owner}/${repo.repo}`);
+    if (/^[0-9a-f]{40}$/.test(ref)) {
+      if (this.listings.size >= SchemaRepositoryReader.MAX_LISTINGS) {
+        this.listings.delete(this.listings.keys().next().value!);
+      }
+      this.listings.set(key, names);
+    }
+    return names;
   }
 
   private async migrationNames(repo: { owner: string; repo: string }, ref: string, repoUrl: string): Promise<string[]> {

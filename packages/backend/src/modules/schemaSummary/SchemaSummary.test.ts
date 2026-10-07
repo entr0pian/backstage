@@ -1,6 +1,7 @@
 import {
   atlasMigrationPhase,
   buildSchemaSummary,
+  codeSchemaCheck,
   compareVersions,
   newestMigrationVersion,
   type K8sAtlasMigration,
@@ -157,5 +158,26 @@ describe('committed DatabaseSchema', () => {
     expect(parseCommittedSchemaVersion(`kind: Release\nspec:\n  version: ${SHA}`)).toBeNull();
     expect(parseCommittedSchemaVersion('kind: DatabaseSchema\nspec:\n  version: abc')).toBeNull();
     expect(parseCommittedSchemaVersion(': not yaml : [')).toBeNull();
+  });
+});
+
+describe('codeSchemaCheck', () => {
+  const files = ['20261007000000_create_items.sql', '20261009093000_add_price.sql'];
+  const appliedAt = (lastAppliedVersion: string | null) =>
+    ({ name: 'x', namespace: 'dev', commit: SHA, phase: 'Applied', lastAppliedVersion, appliedAt: null, reason: null }) as const;
+
+  it('flags code that expects a migration the database has not applied', () => {
+    expect(codeSchemaCheck(SHA, files, appliedAt('20261007000000'))).toEqual({
+      version: SHA,
+      newestMigration: '20261009093000',
+      ahead: true,
+    });
+    expect(codeSchemaCheck(SHA, files, null).ahead).toBe(true);
+  });
+
+  it('is fine when the database is at or past what the code ships', () => {
+    expect(codeSchemaCheck(SHA, files, appliedAt('20261009093000')).ahead).toBe(false);
+    expect(codeSchemaCheck(SHA, files, appliedAt('20261010000000')).ahead).toBe(false);
+    expect(codeSchemaCheck(SHA, [], null)).toEqual({ version: SHA, newestMigration: null, ahead: false });
   });
 });

@@ -74,7 +74,7 @@ export const SchemaVersionPicker = ({
         const baseUrl = await discoveryApi.getBaseUrl('platform');
         const [versionsRes, statusRes] = await Promise.all([
           fetchApi.fetch(`${baseUrl}/schema-versions/${encodeURIComponent(component)}`),
-          fetchApi.fetch(`${baseUrl}/schemas/${encodeURIComponent(component)}/${encodeURIComponent(environment)}`),
+          fetchApi.fetch(`${baseUrl}/schemas/${encodeURIComponent(component)}/${encodeURIComponent(environment)}?committed=1`),
         ]);
         const [versionsBody, statusBody] = await Promise.all([versionsRes.json(), statusRes.json()]);
         if (!versionsRes.ok) {

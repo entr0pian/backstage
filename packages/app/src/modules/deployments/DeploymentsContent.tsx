@@ -44,6 +44,7 @@ import { useComponentVersions, type ComponentVersions } from './useComponentVers
 import { commitUrl, whatChanged, type CommitRef } from './whatChanged';
 import { LogsDialog } from './LogsDialog';
 import { DetailsDrawer } from './DetailsDrawer';
+import { SchemaSection } from './SchemaSection';
 import {
   EnvironmentCard as PlatformEnvironmentCard,
   HealthStatus,
@@ -435,6 +436,8 @@ const EnvironmentCard = ({
             previousKnown={!!progress && progress.phase !== 'Unknown'}
             rollbackHref={rollbackHref}
           />
+
+          <SchemaSection component={component} environment={deployment.environment} canDeploy={canDeploy} />
 
           <div className={classes.footer}>
             <Box display="flex" style={{ gap: 8 }}>

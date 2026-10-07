@@ -167,3 +167,29 @@ export function compareVersions(a: string, b: string): number {
   }
   return x < y ? -1 : 1;
 }
+
+export interface CodeSchemaCheck {
+  // The commit the environment's Release deploys.
+  version: string;
+  // Newest migration file version in that commit's migrations/; null when it
+  // has none.
+  newestMigration: string | null;
+  // The deployed code expects a migration the database hasn't applied: the
+  // schema should be applied before (or with) this version of the code.
+  ahead: boolean;
+}
+
+// Compares the migrations a version of the code ships with what the database
+// has applied. "Applied" is only trusted once the AtlasMigration reports
+// Applied; while it's migrating or failed, lastAppliedVersion is the last
+// good one, which is exactly what the database has.
+export function codeSchemaCheck(
+  version: string,
+  migrationFiles: string[],
+  applied: SchemaSummary['applied'],
+): CodeSchemaCheck {
+  const newestMigration = newestMigrationVersion(migrationFiles);
+  const databaseHas = applied?.lastAppliedVersion ?? null;
+  const ahead = newestMigration !== null && (databaseHas === null || compareVersions(newestMigration, databaseHas) > 0);
+  return { version, newestMigration, ahead };
+}
