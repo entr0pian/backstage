@@ -5,7 +5,7 @@ import {
   ScmIntegrations,
 } from '@backstage/integration';
 import { ReleaseVersionReader } from './ReleaseVersionReader';
-import { DeployableVersionReader } from './DeployableVersionReader';
+import { DeployableVersionReader, SCHEMA_WORKFLOW } from './DeployableVersionReader';
 import { CommittedReleaseReader } from './CommittedReleaseReader';
 import { createRouter } from './router';
 import { EnvironmentSummaryReader } from '../environmentSummary/EnvironmentSummaryReader';
@@ -14,6 +14,8 @@ import { DatabaseSummaryReader } from '../databaseSummary/DatabaseSummaryReader'
 import { ScaffoldVersionReader } from '../scaffoldVersions/ScaffoldVersionReader';
 import { PrometheusClient } from '../observabilitySummary/PrometheusClient';
 import { createObservabilityRouter } from '../observabilitySummary/router';
+import { SchemaReader } from '../schemaSummary/SchemaReader';
+import { SchemaRepositoryReader } from '../schemaSummary/SchemaRepositoryReader';
 
 // Exposes GET /api/platform/releases/:component and
 // GET /api/platform/environments/:component/:environment and
@@ -22,7 +24,10 @@ import { createObservabilityRouter } from '../observabilitySummary/router';
 // GET /api/platform/committed-releases/:component/:environment (Create
 // deployment's Auto-deploy toggle) and
 // GET /api/platform/scaffolds/:template/versions (Onboard Service's Scaffold
-// version picker — reads GitHub only, but shares this router). Gated on
+// version picker — reads GitHub only, but shares this router) and
+// GET /api/platform/schema-versions/:component,
+// /schemas/:component/:environment and /schema-changes/:component (database
+// schemas: the Apply database schema template and the deployment card). Gated on
 // platformCatalog.enabled/platformCatalog.namespaces — the same flag and
 // namespace list PlatformEntityProvider already uses, since both need the
 // same Kubernetes connectivity/RBAC (see
@@ -76,17 +81,14 @@ export const releaseVersionsModule = createBackendPlugin({
         const githubCredentials = DefaultGithubCredentialsProvider.fromIntegrations(
           ScmIntegrations.fromConfig(config),
         );
+        const clusters = ClusterKubeConfigs.fromConfig(config);
         // No addAuthPolicy: the default (user or service credentials
         // required) is what we want — the Deployments card calls this via
         // fetchApi, which already sends the signed-in user's token.
         httpRouter.use(
           createRouter({
             reader,
-            environments: new EnvironmentSummaryReader(
-              reader,
-              ClusterKubeConfigs.fromConfig(config),
-              logger,
-            ),
+            environments: new EnvironmentSummaryReader(reader, clusters, logger),
             databases: new DatabaseSummaryReader(namespaces, reader, logger),
             versions: new DeployableVersionReader({
               catalog,
@@ -95,6 +97,14 @@ export const releaseVersionsModule = createBackendPlugin({
             }),
             committed: new CommittedReleaseReader({ githubCredentials }),
             scaffolds: new ScaffoldVersionReader({ githubCredentials }),
+            schemaVersions: new DeployableVersionReader({
+              catalog,
+              githubCredentials,
+              logger,
+              workflow: SCHEMA_WORKFLOW,
+            }),
+            schemas: new SchemaReader(namespaces, clusters, logger),
+            schemaRepos: new SchemaRepositoryReader(catalog, githubCredentials),
             httpAuth,
             permissions,
           }),

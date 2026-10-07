@@ -13,13 +13,19 @@ import {
 
 // The scaffold's CI workflow file (platform-scaffolds golang-service,
 // .github/workflows/ci.yaml) — the one that builds and pushes the image.
-const CI_WORKFLOW = 'ci.yaml';
+export const CI_WORKFLOW = 'ci.yaml';
+// The scaffold's schema workflow (.github/workflows/schema.yaml), which runs
+// only when migrations/ changes and publishes that commit's schema package.
+// A successful run is a schema version that can be applied.
+export const SCHEMA_WORKFLOW = 'schema.yaml';
 const MAX_VERSIONS = 30;
 
 export interface DeployableVersionReaderOptions {
   catalog: CatalogService;
   githubCredentials: GithubCredentialsProvider;
   logger: LoggerService;
+  // Whose successful runs on main count as versions. Defaults to CI_WORKFLOW.
+  workflow?: string;
 }
 
 export type DeployableVersionsResult =
@@ -35,11 +41,13 @@ export class DeployableVersionReader {
   private readonly catalog: CatalogService;
   private readonly githubCredentials: GithubCredentialsProvider;
   private readonly logger: LoggerService;
+  private readonly workflow: string;
 
   constructor(options: DeployableVersionReaderOptions) {
     this.catalog = options.catalog;
     this.githubCredentials = options.githubCredentials;
     this.logger = options.logger;
+    this.workflow = options.workflow ?? CI_WORKFLOW;
   }
 
   async listForComponent(
@@ -71,16 +79,17 @@ export class DeployableVersionReader {
       status: 'success',
       per_page: String(MAX_VERSIONS),
     });
-    const url = `https://api.github.com/repos/${repo.owner}/${repo.repo}/actions/workflows/${CI_WORKFLOW}/runs?${query}`;
+    const url = `https://api.github.com/repos/${repo.owner}/${repo.repo}/actions/workflows/${this.workflow}/runs?${query}`;
 
     const res = await fetch(url, {
       headers: { Accept: 'application/vnd.github+json', ...headers },
     });
 
-    // No ci.yaml workflow (e.g. a repo not scaffolded from golang-service)
-    // means nothing was ever built — no deployable versions, not an error.
+    // No such workflow (e.g. a repo not scaffolded from golang-service, or
+    // scaffolded before schema.yaml existed) means nothing was ever built —
+    // no versions, not an error.
     if (res.status === 404) {
-      this.logger.info(`deployable-versions: ${repoUrl} has no ${CI_WORKFLOW} workflow`);
+      this.logger.info(`deployable-versions: ${repoUrl} has no ${this.workflow} workflow`);
       return { status: 'ok', repository: repoUrl, versions: [] };
     }
     if (!res.ok) {

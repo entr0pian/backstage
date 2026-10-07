@@ -16,6 +16,11 @@ import type { CommittedReleaseReader } from './CommittedReleaseReader';
 import { isValidName } from './CommittedReleaseMapper';
 import type { ScaffoldVersionReader } from '../scaffoldVersions/ScaffoldVersionReader';
 import { isValidScaffoldName } from '../scaffoldVersions/ScaffoldVersionMapper';
+import type { SchemaReader } from '../schemaSummary/SchemaReader';
+import type { SchemaRepositoryReader } from '../schemaSummary/SchemaRepositoryReader';
+import { buildSchemaSummary } from '../schemaSummary/SchemaSummary';
+
+const COMMIT_SHA = /^[0-9a-f]{40}$/;
 
 // GET /api/platform/releases/:component -> { component, releases: [...] }.
 // A component with no matching Release CRs returns releases: [] with a 200,
@@ -29,10 +34,25 @@ export function createRouter(options: {
   versions: DeployableVersionReader;
   committed: CommittedReleaseReader;
   scaffolds: ScaffoldVersionReader;
+  schemaVersions: DeployableVersionReader;
+  schemas: SchemaReader;
+  schemaRepos: SchemaRepositoryReader;
   httpAuth: HttpAuthService;
   permissions: PermissionsService;
 }): ExpressRouter {
-  const { reader, environments, databases, versions, committed, scaffolds, httpAuth, permissions } = options;
+  const {
+    reader,
+    environments,
+    databases,
+    versions,
+    committed,
+    scaffolds,
+    schemaVersions,
+    schemas,
+    schemaRepos,
+    httpAuth,
+    permissions,
+  } = options;
   const router = Router();
 
   // Owner-only detail is decided per request, server-side, by whether the
@@ -122,6 +142,73 @@ export function createRouter(options: {
       return;
     }
     res.json(buildDatabaseSummary(objects.xr, objects.managed, objects.releases, { includeSensitive }));
+  });
+
+  // GET /api/platform/schema-versions/:component -> { component,
+  // repository, versions: [...] }, newest first — commits on main whose
+  // schema workflow succeeded, i.e. whose schema package was published, for
+  // the Apply database schema template's Version picker. Same shape and
+  // rules as /versions (ci.yaml), from schema.yaml. Nothing sensitive.
+  router.get('/schema-versions/:component', async (req, res) => {
+    const { component } = req.params;
+    if (!isValidName(component)) {
+      res.status(400).json({ error: `Invalid component name: ${component}` });
+      return;
+    }
+    const credentials = await httpAuth.credentials(req);
+    const result = await schemaVersions.listForComponent(component, credentials);
+    if (result.status === 'not-found') {
+      res.status(404).json({ error: result.error });
+      return;
+    }
+    res.json({ component, repository: result.repository, versions: result.versions });
+  });
+
+  // GET /api/platform/schemas/:component/:environment -> { component,
+  // environment, committedVersion, requested, applied }: the DatabaseSchema
+  // committed in git (what the form starts from), the one on management, and
+  // the AtlasMigration on the workload cluster (whether it was applied).
+  // Atlas's condition messages (the failing SQL and database error) are
+  // owner-only, decided here like the environment summary's.
+  router.get('/schemas/:component/:environment', async (req, res) => {
+    const { component, environment } = req.params;
+    if (!isValidName(component) || !isValidName(environment)) {
+      res.status(400).json({ error: `Invalid component or environment name: ${component}/${environment}` });
+      return;
+    }
+    const includeSensitive = await mayReadSensitive(req);
+    const [committedVersion, objects] = await Promise.all([
+      schemaRepos.committedVersion(component, environment),
+      schemas.read(component, environment),
+    ]);
+    res.json({
+      component,
+      environment,
+      committedVersion,
+      ...buildSchemaSummary(objects.databaseSchema, objects.atlasMigration, { includeSensitive }),
+    });
+  });
+
+  // GET /api/platform/schema-changes/:component?head=<sha>[&base=<sha>] ->
+  // { component, repository, files: [{name, status}] }: the migration files
+  // applying head changes over base (every file at head without a base), for
+  // the Apply database schema form and its pull request. Nothing sensitive:
+  // file names in the component's own repo.
+  router.get('/schema-changes/:component', async (req, res) => {
+    const { component } = req.params;
+    const head = String(req.query.head ?? '');
+    const base = req.query.base ? String(req.query.base) : undefined;
+    if (!isValidName(component) || !COMMIT_SHA.test(head) || (base !== undefined && !COMMIT_SHA.test(base))) {
+      res.status(400).json({ error: 'Expected a component name, head=<commit sha> and optionally base=<commit sha>' });
+      return;
+    }
+    const credentials = await httpAuth.credentials(req);
+    const result = await schemaRepos.changes(component, base, head, credentials);
+    if (result.status === 'not-found') {
+      res.status(404).json({ error: result.error });
+      return;
+    }
+    res.json({ component, repository: result.repository, files: result.files });
   });
 
   return router;

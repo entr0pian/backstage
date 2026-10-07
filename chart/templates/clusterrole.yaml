@@ -24,6 +24,11 @@ rules:
   - apiGroups: ["platform.taskapp.io"]
     resources: ["releases"]
     verbs: ["get", "list", "watch"]
+  # The Apply database schema form and the deployment card: which schema
+  # version each environment is asked to have.
+  - apiGroups: ["platform.taskapp.io"]
+    resources: ["databaseschemas"]
+    verbs: ["get", "list", "watch"]
   # Environment Details summary (BACKSTAGE_PART9.md Part A) — workload,
   # networking, binding and warning-event state for one component in one
   # environment, selected by the platform.taskapp.io/* labels. Read-only.
@@ -45,6 +50,11 @@ rules:
     verbs: ["get", "list", "watch"]
   - apiGroups: ["external-secrets.io"]
     resources: ["externalsecrets"]
+    verbs: ["get", "list", "watch"]
+  # The deployment card's schema row, for an environment running on this
+  # cluster (platform.localEnvironment). Status only.
+  - apiGroups: ["db.atlasgo.io"]
+    resources: ["atlasmigrations"]
     verbs: ["get", "list", "watch"]
   # Database page (BACKSTAGE_PART9.md Part B) + Database entity owners.
   # components: to take a Database entity's owner from its Component CR.
