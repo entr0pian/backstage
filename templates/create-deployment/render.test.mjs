@@ -127,3 +127,33 @@ test('turning auto-deploy off pins the chosen version again', () => {
   assert.match(rendered, new RegExp(`version: "${SHA}"`));
   assert.doesNotMatch(rendered, /autoDeploy/);
 });
+
+test('an auto-deploy Release keeps its committed version when only a binding changes', () => {
+  assert.equal(
+    render({
+      componentName: 'orders',
+      environment: 'dev',
+      autoDeploy: true,
+      version: SHA,
+      bindings: { database: 'orders-db' },
+    }),
+    `apiVersion: platform.taskapp.io/v1alpha1
+kind: Release
+metadata:
+  name: orders-dev
+  labels:
+    platform.taskapp.io/component: orders
+spec:
+  componentRef:
+    name: orders
+  environment: dev
+  version: "${SHA}"
+  autoDeploy:
+    branch: main
+  bindings:
+    database:
+      enabled: true
+      ref: orders-db
+`,
+  );
+});

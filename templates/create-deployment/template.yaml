@@ -47,7 +47,7 @@ spec:
         version:
           title: Version
           type: string
-          description: Any commit on main with a green build. Not used when Auto-deploy is on.
+          description: Any commit on main with a green build. With Auto-deploy on, the committed version is kept and moves forward on its own.
           pattern: '^[0-9a-f]{40}$'
           ui:field: PlatformVersionPicker
         bindings:
@@ -106,8 +106,8 @@ spec:
           the whole of `platform/environments/${{ parameters.environment }}/${{ parameters.componentName }}-release.yaml`:
           for a new environment that's a new file, for an existing one the
           diff is only what changed (usually `version:`; turning auto-deploy
-          on adds `autoDeploy: {branch: main}` and drops `version:`, which
-          release-operator then sets to the newest build).
+          on adds `autoDeploy: {branch: main}` and keeps the current
+          `version:`, which release-operator then moves to the newest build).
 
           Merging deploys it: release-operator writes the component's
           environment files and Argo CD syncs them. With auto-deploy on,

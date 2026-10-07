@@ -10,6 +10,8 @@ import { makeStyles } from '@material-ui/core/styles';
 import { discoveryApiRef, fetchApiRef, useApi } from '@backstage/core-plugin-api';
 import type { FieldExtensionComponentProps } from '@backstage/plugin-scaffolder-react';
 import { timeAgo } from '../platformUi';
+import { fetchCommittedRelease } from './autoDeploy';
+import { autoDeployVersion } from './autoDeployVersion';
 
 // Mirrors the backend's DeployableVersion (modules/releaseVersions).
 interface DeployableVersion {
@@ -58,6 +60,7 @@ export const VersionPicker = ({
   const discoveryApi = useApi(discoveryApiRef);
   const fetchApi = useApi(fetchApiRef);
   const component: string | undefined = formContext?.formData?.componentName;
+  const environment: string | undefined = formContext?.formData?.environment;
   // Opened with a version already chosen (a deployment card's Roll back): it
   // stays locked to it, like ComponentPicker. Decided once, on open.
   const [locked] = useState(() => Boolean(formData));
@@ -95,11 +98,34 @@ export const VersionPicker = ({
     };
   }, [discoveryApi, fetchApi, component]);
 
+  // Auto-deploy on: there's nothing to choose, but the PR keeps the version
+  // committed today (release-operator only ever moves it forward to a newer
+  // green build). Dropping it would leave the Release with no version until
+  // the operator's next poll put the same one back.
+  const [committedVersion, setCommittedVersion] = useState<string | null | undefined>(undefined);
   useEffect(() => {
-    if (autoDeploy && formData) {
-      onChange(undefined as unknown as string);
+    if (!autoDeploy || !component || !environment) {
+      setCommittedVersion(undefined);
+      return undefined;
     }
-  }, [autoDeploy, formData, onChange]);
+    let cancelled = false;
+    fetchCommittedRelease(discoveryApi, fetchApi, component, environment)
+      .then(r => !cancelled && setCommittedVersion(r.version))
+      .catch(() => !cancelled && setCommittedVersion(null));
+    return () => {
+      cancelled = true;
+    };
+  }, [discoveryApi, fetchApi, autoDeploy, component, environment]);
+
+  useEffect(() => {
+    if (!autoDeploy || committedVersion === undefined) {
+      return;
+    }
+    const keep = autoDeployVersion(committedVersion);
+    if ((formData ?? undefined) !== keep) {
+      onChange(keep as unknown as string);
+    }
+  }, [autoDeploy, committedVersion, formData, onChange]);
 
   const versions = state.status === 'done' ? state.versions : [];
   let helperText = schema.description;
@@ -111,7 +137,9 @@ export const VersionPicker = ({
     helperText = 'No commit on main has a built image yet.';
   }
   if (autoDeploy) {
-    helperText = 'Auto-deploy is on: every successful build on main deploys automatically.';
+    helperText = committedVersion
+      ? `Auto-deploy is on: every successful build on main deploys automatically (currently ${committedVersion.slice(0, 7)}).`
+      : 'Auto-deploy is on: every successful build on main deploys automatically.';
   }
 
   return (
