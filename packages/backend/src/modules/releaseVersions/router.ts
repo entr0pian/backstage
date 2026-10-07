@@ -193,7 +193,10 @@ export function createRouter(options: {
       r => r.spec?.componentRef?.name === component && r.spec?.environment === environment,
     );
     const version = release?.spec?.version;
-    if (version && COMMIT_SHA.test(version) && (summary.requested || summary.applied)) {
+    // Checked once a schema is released here, or as soon as the Release binds
+    // a database: the code then expects tables, even before any schema.
+    const bindsDatabase = Boolean(release?.spec?.bindings?.database?.enabled);
+    if (version && COMMIT_SHA.test(version) && (summary.requested || summary.applied || bindsDatabase)) {
       try {
         const files = await schemaRepos.migrationsAt(component, version, credentials);
         code = files ? codeSchemaCheck(version, files, summary.applied) : null;

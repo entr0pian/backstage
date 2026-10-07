@@ -29,9 +29,10 @@ const WAITING: Record<string, string> = {
   ComponentRepositoryNotReady: "waiting for the Component's repository",
 };
 
-// null: nothing to show (no schema released for this environment).
+// null: nothing to show (no schema released for this environment, and no
+// warning to give).
 export function schemaView(s: SchemaStatus | null): SchemaView | null {
-  if (!s || (!s.requested && !s.applied)) {
+  if (!s || (!s.requested && !s.applied && !s.code?.ahead)) {
     return null;
   }
   const { requested, applied, code } = s;
@@ -52,6 +53,18 @@ export function schemaView(s: SchemaStatus | null): SchemaView | null {
       detail: `${short(requested.version)} requested`,
       reason: WAITING[requested.reason ?? ''] ?? requested.reason,
       message: requested.message ?? null,
+      warning,
+    };
+  }
+  if (!applied && !requested) {
+    // The Release binds a database, and the code ships migrations nobody
+    // has applied here.
+    return {
+      tone: 'error',
+      status: 'Not applied',
+      detail: null,
+      reason: 'no schema has been applied to this database yet',
+      message: null,
       warning,
     };
   }

@@ -53,6 +53,14 @@ describe('schemaView', () => {
     expect(v?.reason).toContain('schema package');
   });
 
+  it('warns when a bound database has no schema at all', () => {
+    const v = schemaView(
+      status({ requested: null, applied: null, code: { version: B, newestMigration: '20261007000000', ahead: true } }),
+    );
+    expect(v).toMatchObject({ tone: 'error', status: 'Not applied' });
+    expect(v?.warning).toContain('but the database has none applied');
+  });
+
   it('warns when the deployed code expects a newer migration', () => {
     const v = schemaView(status({ code: { version: B, newestMigration: '20261010000000', ahead: true } }));
     expect(v?.warning).toBe(
