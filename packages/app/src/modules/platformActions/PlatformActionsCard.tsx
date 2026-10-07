@@ -1,11 +1,13 @@
 import Box from '@material-ui/core/Box';
 import CloudUploadIcon from '@material-ui/icons/CloudUpload';
 import StorageIcon from '@material-ui/icons/Storage';
+import TableChartIcon from '@material-ui/icons/TableChart';
 import { InfoCard, LinkButton } from '@backstage/core-components';
 import { useEntity } from '@backstage/plugin-catalog-react';
 import { usePermission } from '@backstage/plugin-permission-react';
 import { taskCreatePermission } from '@backstage/plugin-scaffolder-common/alpha';
 import { addDatabaseHref } from './addDatabaseHref';
+import { applySchemaHref } from './applySchemaHref';
 import { createDeploymentHref } from './createDeploymentHref';
 
 export const PlatformActionsCard = () => {
@@ -36,6 +38,14 @@ export const PlatformActionsCard = () => {
           startIcon={<StorageIcon />}
         >
           Add database
+        </LinkButton>
+        <LinkButton
+          to={applySchemaHref(entity.metadata.name)}
+          color="primary"
+          variant="outlined"
+          startIcon={<TableChartIcon />}
+        >
+          Apply database schema
         </LinkButton>
       </Box>
     </InfoCard>

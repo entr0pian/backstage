@@ -4,6 +4,7 @@ import { EnvironmentPicker } from './EnvironmentPicker';
 import { VersionPicker } from './VersionPicker';
 import { AutoDeployToggle, autoDeployToggleValidation } from './AutoDeployToggle';
 import { DependencyBindingsPicker } from './DependencyBindingsPicker';
+import { SchemaVersionPicker } from './SchemaVersionPicker';
 
 // `ui:field` names used by templates/create-deployment/template.yaml (and
 // add-database, for the component and environment pickers).
@@ -31,4 +32,10 @@ export const versionPickerField = createFormField({
 export const dependencyBindingsPickerField = createFormField({
   name: 'PlatformDependencyBindingsPicker',
   component: DependencyBindingsPicker,
+});
+
+// templates/apply-schema/template.yaml
+export const schemaVersionPickerField = createFormField({
+  name: 'PlatformSchemaVersionPicker',
+  component: SchemaVersionPicker,
 });

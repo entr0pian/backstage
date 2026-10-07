@@ -1,0 +1,111 @@
+apiVersion: scaffolder.backstage.io/v1beta3
+kind: Template
+metadata:
+  name: apply-schema
+  title: Apply database schema
+  description: >-
+    Apply a version of a service's database migrations to an environment's
+    database, separately from deploying its code. Opens a pull request with
+    its DatabaseSchema; once it's merged, Atlas applies the new migrations.
+spec:
+  owner: user:guest
+  type: database
+
+  parameters:
+    - title: Database schema
+      required:
+        - componentName
+        - environment
+        - schema
+      properties:
+        componentName:
+          title: Component
+          type: string
+          description: The service whose migrations to apply.
+          ui:field: PlatformComponentPicker
+        environment:
+          title: Environment
+          type: string
+          description: Whose database gets them.
+          ui:field: PlatformEnvironmentPicker
+        schema:
+          title: Schema version
+          type: object
+          description: >-
+            Any commit on main whose schema workflow published a package.
+            Forward only: the environment's current version and older ones
+            can't be chosen.
+          required:
+            - version
+          properties:
+            version:
+              type: string
+              pattern: '^[0-9a-f]{40}$'
+            previous:
+              type: string
+            repository:
+              type: string
+            files:
+              type: array
+              items:
+                type: string
+          ui:field: PlatformSchemaVersionPicker
+
+  steps:
+    - id: render-schema
+      name: Render DatabaseSchema manifest
+      action: fetch:template
+      input:
+        url: ./skeleton
+        targetPath: platform/environments/${{ parameters.environment }}
+        values:
+          componentName: ${{ parameters.componentName }}
+          version: ${{ parameters.schema.version }}
+
+    # fetch:template only templates file contents, not names, so the static
+    # schema.yaml is renamed to the <component>-db-schema.yaml the platform
+    # (and Backstage's committed-version read) uses.
+    - id: rename-schema
+      name: Rename to <component>-db-schema.yaml
+      action: fs:rename
+      input:
+        files:
+          - from: platform/environments/${{ parameters.environment }}/schema.yaml
+            to: platform/environments/${{ parameters.environment }}/${{ parameters.componentName }}-db-schema.yaml
+
+    # One PR per apply: the branch carries the version, so merging it is what
+    # applies that version.
+    - id: open-pr
+      name: Open pull request
+      action: publish:github:pull-request
+      input:
+        repoUrl: github.com?repo=application-repositories&owner=entr0pian
+        branchName: backstage/schema-${{ parameters.componentName }}-${{ parameters.environment }}-${{ parameters.schema.version | truncate(7, true, "") }}
+        title: Apply ${{ parameters.componentName }} schema ${{ parameters.schema.version | truncate(7, true, "") }} to ${{ parameters.environment }}
+        description: |-
+          Sets the `DatabaseSchema` for `${{ parameters.componentName }}` in `${{ parameters.environment }}`.
+
+          | Field | Value |
+          |---|---|
+          | Requested by | `${{ user.ref }}` |
+          | Component | `${{ parameters.componentName }}` |
+          | Environment | `${{ parameters.environment }}` |
+          | Version | `${{ parameters.schema.version }}` |
+          | Currently | ${{ ('`' + parameters.schema.previous + '`') if parameters.schema.previous else 'no schema applied yet' }} |
+          | Changes | ${{ (parameters.schema.repository + '/compare/' + parameters.schema.previous + '...' + parameters.schema.version) if (parameters.schema.repository and parameters.schema.previous) else ((parameters.schema.repository + '/tree/' + parameters.schema.version + '/migrations') if parameters.schema.repository else '') }} |
+
+          Migration files this applies, in order:
+
+          ${{ ('`' + (parameters.schema.files | join('`, `')) + '`') if (parameters.schema.files and parameters.schema.files.length) else '_none: no migration file changes_' }}
+
+          Generated through Backstage's **Apply database schema** template.
+          Merging applies it: schema-operator points the environment at that
+          commit's schema package, Argo CD deploys it, and Atlas applies the
+          migrations the database hasn't run yet. The service's code isn't
+          touched. The platform applies migrations forward only: to undo one,
+          add a migration that reverses it.
+
+  output:
+    links:
+      - title: Pull request
+        url: ${{ steps['open-pr'].output.remoteUrl }}

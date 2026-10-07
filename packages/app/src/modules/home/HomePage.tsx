@@ -5,6 +5,7 @@ import Typography from '@material-ui/core/Typography';
 import { alpha, makeStyles } from '@material-ui/core/styles';
 import AddBoxOutlinedIcon from '@material-ui/icons/AddBoxOutlined';
 import StorageOutlinedIcon from '@material-ui/icons/StorageOutlined';
+import TableChartOutlinedIcon from '@material-ui/icons/TableChartOutlined';
 import RocketLaunchIcon from '@material-ui/icons/FlightTakeoff';
 import ArrowForwardIcon from '@material-ui/icons/ArrowForward';
 import LockOutlinedIcon from '@material-ui/icons/LockOutlined';
@@ -199,6 +200,12 @@ const QUICK_ACTIONS = [
     text: 'Open the Release PR that Argo CD and release-operator roll out.',
     icon: <RocketLaunchIcon />,
   },
+  {
+    template: 'apply-schema',
+    title: 'Apply a database schema',
+    text: "Ship a service's migrations to an environment's database, separately from its code.",
+    icon: <TableChartOutlinedIcon />,
+  },
 ];
 
 const Stat = ({ value, label }: { value: ReactNode; label: string }) => {
@@ -307,7 +314,7 @@ export const HomePage = () => {
       </Typography>
       <Grid container spacing={2}>
         {QUICK_ACTIONS.map(a => (
-          <Grid item xs={12} md={4} key={a.template}>
+          <Grid item xs={12} sm={6} lg={3} key={a.template}>
             <Link to={`/create/templates/default/${a.template}`} className={classes.action}>
               <span className={classes.actionIcon}>{a.icon}</span>
               <span>

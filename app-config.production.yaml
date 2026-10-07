@@ -76,3 +76,9 @@ catalog:
       target: ./templates/create-deployment/template.yaml
       rules:
         - allow: [Template]
+
+    # Apply database schema template (platform-architecture DATABASE_SCHEMAS_PLAN.md)
+    - type: file
+      target: ./templates/apply-schema/template.yaml
+      rules:
+        - allow: [Template]

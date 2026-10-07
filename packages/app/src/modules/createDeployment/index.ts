@@ -29,7 +29,19 @@ const dependencyBindingsPicker = FormFieldBlueprint.make({
   params: { field: () => import('./fields').then(m => m.dependencyBindingsPickerField) },
 });
 
+const schemaVersionPicker = FormFieldBlueprint.make({
+  name: 'platform-schema-version-picker',
+  params: { field: () => import('./fields').then(m => m.schemaVersionPickerField) },
+});
+
 export const createDeploymentModule = createFrontendModule({
   pluginId: 'scaffolder',
-  extensions: [componentPicker, environmentPicker, autoDeployToggle, versionPicker, dependencyBindingsPicker],
+  extensions: [
+    componentPicker,
+    environmentPicker,
+    autoDeployToggle,
+    versionPicker,
+    dependencyBindingsPicker,
+    schemaVersionPicker,
+  ],
 });

@@ -1,0 +1,10 @@
+apiVersion: platform.taskapp.io/v1alpha1
+kind: DatabaseSchema
+metadata:
+  name: ${{ values.componentName }}
+  labels:
+    platform.taskapp.io/component: ${{ values.componentName }}
+spec:
+  componentRef:
+    name: ${{ values.componentName }}
+  version: "${{ values.version }}"

@@ -36,6 +36,9 @@ jobs:
       - name: Onboard Service template render test
         run: node --test templates/onboard-service/render.test.mjs
 
+      - name: Apply database schema template render test
+        run: node --test templates/apply-schema/render.test.mjs
+
       - name: Build backend bundle
         run: yarn build:backend
 
