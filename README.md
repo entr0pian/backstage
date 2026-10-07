@@ -1,451 +1,107 @@
-# [Backstage](https://backstage.io)
+# backstage
 
-This is your newly scaffolded Backstage App, Good Luck!
+The platform's developer portal, built on [Backstage](https://backstage.io).
+It's the only interface a developer needs: golden paths to onboard a service,
+deploy a version or add a database, and one page per service showing what runs
+where, whether it's healthy, and what it depends on.
 
-To start the app, run:
+Live at [platform.gerodimos.dev](https://platform.gerodimos.dev): sign in as
+guest to browse read-only. The cluster is rebuilt daily, so it's up only while
+being worked on.
 
-```sh
-yarn install
-yarn start
+- **Every action is a pull request.** Templates render a small file into
+  [application-repositories](https://github.com/entr0pian/application-repositories)
+  and open a PR as the portal's own GitHub App. Backstage never writes to a
+  cluster.
+- **Read-only to the world.** Guests can browse everything safe to show. Only
+  the owner's GitHub sign-in can run templates or see logs.
+- **No per-service setup.** Services appear in the catalog, the Deployments tab
+  and the Metrics tab because of the labels the platform already puts on them.
+
+## Where it fits
+
+```mermaid
+flowchart LR
+    DEV(["Developer"]) --> BS["Backstage"]
+    BS -->|"PR as<br/>taskapp-platform-portal[bot]"| AR[("application-repositories")]
+    AR -->|Argo CD| MG["management<br/>operators + Crossplane"]
+    MG --> WL["dev · prod"]
+    GH[("service repos<br/>catalog-info.yaml")] -.->|discovery| BS
+    MG -.->|"Component · Release · Database"| BS
+    ARGO["Argo CD API"] -.->|rollout state| BS
+    WL -.->|"pods, logs<br/>(read-only)"| BS
+    MIMIR["Mimir"] -.->|metrics| BS
 ```
 
-## Onboard Service template
+Solid arrows are what a developer causes. Dotted arrows are what the portal
+reads to show the result.
 
-Milestone 1 of the platform's Backstage integration (see `BACKSTAGE.md` in the
-`platform-architecture` repo) — lets a developer onboard a new service without
-touching Kubernetes or `application-repositories` by hand.
+## Golden paths
 
-```
-Backstage → Create → Onboard Service
-    ↓
-Backstage renders a Component CR and opens a PR against
-entr0pian/application-repositories
-    ↓
-Developer reviews/merges the PR
-    ↓
-Existing GitOps flow takes over: component-operator reconciles the
-Component into an owned GitHubRepository + ScaffoldRequest
-```
+| Template | Asks for | Opens a PR adding |
+|---|---|---|
+| **Onboard a service** | name, owner, visibility, scaffold template and version (from [platform-scaffolds](https://github.com/entr0pian/platform-scaffolds) tags), auto-deploy on or off | `platform/registry/<name>.yaml` (`Component`) and, with auto-deploy, its first `Release` following `main` |
+| **Create deployment** | component, environment, a green build (or auto-deploy instead), which databases to bind | `platform/environments/<env>/<name>-release.yaml` (`Release`) |
+| **Add a database** | component, environment, database name, size | `platform/environments/<env>/<name>-db.yaml` (`Database`) |
 
-Backstage only ever renders a file and opens a PR — it never talks to
-Kubernetes or GitHub repository-provisioning APIs directly. See
-`PLATFORM_API_ARCHITECTURE.md` in `platform-architecture` for what happens
-after the PR merges.
+After the merge, the operators take over:
+[component-operator](https://github.com/entr0pian/component-operator) creates
+and scaffolds the repository,
+[release-operator](https://github.com/entr0pian/release-operator) writes the
+deployment, and [crossplane-compositions](https://github.com/entr0pian/crossplane-compositions)
+provisions the database.
 
-- **Template location**: `templates/onboard-service/template.yaml`
-  (+ `skeleton/component.yaml`, renamed to `<name>.yaml` by an `fs:rename`
-  step — `fetch:template` templates file contents, not file names),
-  registered as a catalog `Template` location in `app-config.yaml`.
-- **Destination repo**: `entr0pian/application-repositories`, via a PR from
-  branch `backstage/onboard-<name>` (uses the built-in
-  `publish:github:pull-request` scaffolder action — no custom backend plugin).
-- **Destination path**: `platform/registry/<name>.yaml` — a `Component` CR,
-  applied verbatim once merged (no Helm chart/values involved).
+## A service's page
 
-Example rendered manifest for `name=order-service`, `owner=order-team`,
-`visibility=public`, `scaffoldTemplate=golang-service`,
-`scaffoldVersion=0.3.0`:
+| Tab | Shows | Source |
+|---|---|---|
+| Overview | owner, repository, dependencies | catalog entity from the repo's `catalog-info.yaml` |
+| Deployments | one card per environment: version, what changed, live rollout steps, sync and health; a Details drawer with the public URL; Logs for the owner | `Release`s on management, the Argo CD API, the workload clusters |
+| Metrics | one golden-signals card per environment (request rate, 5xx %, p95, CPU and memory as % of limit, replicas, restarts) and a link to Grafana | Mimir, through a fixed-query backend route |
+| Dependencies | the databases a service owns and binds, per environment | `Database` resources, published as catalog `Resource` entities |
 
-```yaml
-apiVersion: platform.taskapp.io/v1alpha1
-kind: Component
-metadata:
-  name: order-service
-  labels:
-    platform.taskapp.io/component: order-service
-spec:
-  owner: order-team
-  repository:
-    name: order-service
-    visibility: public
-  scaffold:
-    template: golang-service
-    version: "0.3.0"
-```
+## How it's built
 
-### Required configuration
+Stock Backstage plugins (catalog, scaffolder, Kubernetes, the community Argo CD
+plugin) plus a few small platform modules in this repo:
 
-GitHub auth is the existing `integrations.github` block in `app-config.yaml`
-— nothing new to configure for this template. It needs one environment
-variable, read at startup (never commit the token itself):
-
-| Variable | Purpose |
+| Module | Does |
 |---|---|
-| `GITHUB_TOKEN` | PAT (or GitHub App token) with `contents:write` + `pull_requests:write` on `entr0pian/application-repositories`, used by both the catalog GitHub integration and the scaffolder's `publish:github:pull-request` action |
+| `platformEntityProvider` | Reads `Database` resources from management and publishes them as catalog entities linked to their `Component` |
+| `releaseVersions` | Backend routes under `/api/platform/*`: Releases, deployable builds, committed Release files, scaffold versions, environment and database details |
+| `observabilitySummary` | `GET /api/platform/observability/components/:c/environments/:e`. It accepts only the two names and runs fixed PromQL against Mimir, so guests can't send arbitrary queries |
+| `platformClusters` | Adds the registered workload clusters to the Kubernetes plugin, reached with a read-only IAM role |
+| `argocdAnnotator` | Stamps an `argocd/app-selector` on every component, so the Argo CD plugin finds its Applications by the platform's labels |
+| `permissionPolicy` | An explicit allowlist for guests. A permission a new plugin introduces stays denied until it's listed |
 
-`GITHUB_TOKEN` is for running locally. The deployed instance never uses a
-PAT: it authenticates as the `taskapp-platform-portal` GitHub App (chart
-value `githubApp.secretPath`), so PRs are opened by
-`taskapp-platform-portal[bot]` with short-lived installation tokens, and each
-PR's table records who requested it. The chart still accepts a PAT through
-`github.secretPath`, but only when no App is configured.
+## Design choices
 
-### Running locally
+- **PRs, not API calls.** A template that wrote to a cluster would bypass
+  review and Git history. A PR is reviewable, revertable, and the same path
+  everything else takes.
+- **Fixed queries for guests.** Exposing a Prometheus proxy would let anyone run
+  any query. One route with two path parameters exposes exactly the numbers on
+  the page.
+- **Discovery by label, not by name.** Argo CD Applications and Kubernetes
+  workloads are found through `platform.taskapp.io/{component,environment}`,
+  so naming conventions can change without breaking the portal.
+- **A GitHub App, not a PAT.** PRs come from `taskapp-platform-portal[bot]`
+  with short-lived tokens, not from a person's account.
+
+## Delivery
+
+On every push, CI type-checks, runs the Onboard Service template render test
+and builds the backend. On `main` it pushes `ghcr.io/entr0pian/backstage:<sha>`,
+then the shared `bump-infra` workflow in application-repositories pins the
+chart and image to that SHA, and Argo CD rolls it out to `management`. The
+Helm chart is in `chart/`. Its credentials (GitHub App, OAuth, Argo CD token,
+cluster access) come from AWS Secrets Manager through External Secrets.
+
+## Development
 
 ```sh
-export GITHUB_TOKEN=<a token with access to entr0pian/application-repositories>
 yarn install
-yarn start
+yarn start      # app + backend, against app-config.yaml
+yarn tsc
+yarn test
 ```
-
-Then open `http://localhost:3000/create`, choose **Onboard Service**, fill in
-the form, and submit — Backstage returns a link to the opened pull request.
-
-### Testing the flow
-
-- **Template rendering** (no network, no Backstage runtime needed):
-  ```sh
-  node --test templates/onboard-service/render.test.mjs
-  ```
-  Verifies the skeleton renders the exact manifest shape above from known
-  inputs, and that the name field's DNS-style validation accepts
-  `order-service`/`payments`/`customer-api` and rejects
-  `Payments Service`/`My_Service`/`TEST SERVICE`.
-- **End-to-end**: run the app locally as above, submit the form with a
-  throwaway component name, confirm the PR lands on
-  `entr0pian/application-repositories` with the expected
-  `platform/registry/<name>.yaml`, then close it without merging.
-
-## Catalog discovery (Milestone 2)
-
-Milestone 2 (see `BACKSTAGE_PART2.md` in `platform-architecture`) closes the
-loop after a service is scaffolded: it becomes a Backstage Catalog entity
-automatically, with no manual "Register Existing Component" step.
-
-```
-scaffold-operator commits the new repository
-    ↓
-repository root contains catalog-info.yaml
-  (rendered by platform-scaffolds' golang-service template — see that
-  repo's template/catalog-info.yaml.tpl)
-    ↓
-Backstage's GitHub Catalog Provider polls entr0pian on a schedule
-    ↓
-finds catalog-info.yaml on main, registers it
-    ↓
-service appears in the Catalog
-```
-
-- **Why generated by `platform-scaffolds`, not Backstage**: the service
-  repository doesn't exist yet when the onboarding form is submitted (see
-  Milestone 1 above) — `catalog-info.yaml` can only be written once
-  `scaffold-operator` renders the template into the new repo. Backstage
-  never writes to the service repository directly.
-- **Identity convention**: `catalog-info.yaml`'s `metadata.name` is always
-  the same string as the platform `Component`'s `metadata.name` and the
-  GitHub repository name (e.g. `invoice` == `invoice` == `invoice`). No
-  `componentRef` is added to the Backstage entity — future platform APIs
-  (`Database`, `Release`) correlate through that shared name instead.
-- **Discovery mechanism**: `@backstage/plugin-catalog-backend-module-github`
-  (the official GitHub Catalog Provider), registered in
-  `packages/backend/src/index.ts` and configured under
-  `catalog.providers.github.entr0pian` in `app-config.yaml`
-  (`organization: entr0pian`, `catalogPath: /catalog-info.yaml`,
-  `filters.branch: main`). It reuses the same `integrations.github` PAT
-  Milestone 1 already uses for `publish:github:pull-request` — no new
-  credentials.
-- **Schedule**: every 30 minutes (`schedule.frequency: { minutes: 30 }`,
-  `timeout: { minutes: 3 }`). There's no on-demand trigger; a newly
-  scaffolded repo shows up in the Catalog within that window.
-- **Verifying discovery**: open `/catalog` in Backstage and search for the
-  component name, or check the backend log for
-  `Registered scheduled task: github-provider:entr0pian:refresh` at startup
-  and a subsequent run with no `HttpError`/`Bad credentials` entries for
-  that task.
-
-## Add Database template (Milestone 3)
-
-Milestone 3 (see `BACKSTAGE_PART3.md` in `platform-architecture`) lets a
-developer add a database to an existing service straight from its Catalog
-page, instead of hand-writing a `Database` CR.
-
-```
-Catalog → <component> → Platform Actions → + Add Database
-    ↓
-componentName is derived from the entity, not typed by the user
-    ↓
-form: Environment / Database name / Size
-    ↓
-Backstage renders a Database CR and opens a PR against
-entr0pian/application-repositories
-    ↓
-Developer reviews/merges the PR
-    ↓
-Existing GitOps flow takes over: the platform's Database XR
-(crossplane-compositions' apis/database) provisions the RDS instance
-```
-
-As with Milestone 1, Backstage only ever renders a file and opens a PR — it
-never creates a `Release` or talks to Kubernetes/Crossplane directly.
-
-- **Entity-page action**: `packages/app/src/modules/platformActions/`, a
-  small frontend module (same `createFrontendModule` pattern as
-  `modules/nav/`) registering one `EntityCardBlueprint` extension from
-  `@backstage/plugin-catalog-react/alpha` — the mechanism the app's new
-  frontend system (`createApp`/`features`) uses for entity-page cards,
-  in place of a hand-edited `EntityPage.tsx`. The card is filtered to
-  `kind: Component` + `spec.type: service` entities and links to the
-  template with the entity's name pre-filled.
-- **How `componentName` gets forwarded without manual entry**: the link is
-  `/create/templates/default/add-database?formData={"componentName":"<name>"}`.
-  `@backstage/plugin-scaffolder-react`'s `useFormDataFromQuery` hook reads
-  that `formData` query param as the form's initial state. The field is
-  `ui:field: PlatformComponentPicker` (also used by Create deployment): it
-  stays locked when the form opens with a component, and is a dropdown of
-  the catalog's services when the template is started from Home or the
-  template list.
-- **Template location**: `templates/add-database/template.yaml`
-  (+ `skeleton/database.yaml`, renamed to `<component>-db.yaml` by an
-  `fs:rename` step, same reason as Milestone 1's rename step), registered
-  as a catalog `Template` location in `app-config.yaml`.
-- **Destination repo**: `entr0pian/application-repositories`, via a PR from
-  branch `backstage/add-database-<component>-<environment>` (built-in
-  `publish:github:pull-request` action, no custom backend plugin).
-- **Destination path**: `platform/environments/<environment>/<component>-db.yaml`
-  — a `Database` CR, applied verbatim once merged.
-- **Environments offered**: `dev`, `prod`, `management`. `platform/` CRs
-  always land in a namespace on the management cluster regardless of which
-  env folder they're filed under (see `application-repositories/README.md`'s
-  `platform/` section) — `management` is included as a real choice, not just
-  a fallback, specifically for single-cluster setups (e.g. the EKS
-  management cluster standing in for dev/prod while only one real cluster
-  exists) where `dev`/`prod` aren't reachable at all.
-- **Size**: `small` / `medium` / `large`, matching
-  `crossplane-compositions/apis/database/xrd.yaml`'s `spec.size` enum
-  exactly — this template doesn't expose or invent any other tier.
-- **No duplicate-safety check**: unlike spec §13's ask, this template does
-  *not* pre-check whether `platform/environments/<env>/<component>-db.yaml`
-  already exists before opening the PR. `fetch:plain` (the built-in action
-  that would do the raw-content check) has no way to continue past a 404 —
-  the scaffolder step schema only supports `if`/`each` pre-execution
-  conditions, not catching a step's own failure — so a clean check without a
-  custom backend action isn't possible with built-in actions alone. Decided
-  with the user to ship without it for v1 and rely on PR review to catch a
-  duplicate (the PR description says as much). A small custom scaffolder
-  action is the documented path to add this later if it's worth the extra
-  code — see the "necessary" carve-out in `BACKSTAGE_PART3.md` §8.
-
-Example rendered manifest for `componentName=checkout`, `environment=dev`,
-`dbName=checkoutdb`, `size=small`:
-
-```yaml
-apiVersion: database.taskapp.io/v1alpha1
-kind: Database
-metadata:
-  name: checkout-db
-  labels:
-    platform.taskapp.io/component: checkout
-spec:
-  componentRef:
-    name: checkout
-  dbName: checkoutdb
-  size: small
-```
-
-### Running locally
-
-Same `GITHUB_TOKEN` as Milestone 1 — no new configuration. Start the app,
-open an existing service's Catalog page (one with `spec.type: service`,
-e.g. anything onboarded via Milestone 1 + discovered via Milestone 2), and
-the **Platform Actions** card with **+ Add Database** appears.
-
-### Testing the flow
-
-- **Template rendering** (no network, no Backstage runtime needed):
-  ```sh
-  node --test templates/add-database/render.test.mjs
-  ```
-- **Entity-link forwarding** (no network, no Backstage runtime needed):
-  ```sh
-  yarn workspace app test --testPathPatterns platformActions
-  ```
-  Verifies that given an entity named `checkout`, the generated link's
-  `formData` query param decodes to `{"componentName":"checkout"}`.
-- **End-to-end**: run the app locally as above, open a service's Catalog
-  page, click **+ Add Database**, confirm Component is shown and not
-  editable, fill in the rest with throwaway values, submit, confirm the PR
-  lands on `entr0pian/application-repositories` with the expected
-  `platform/environments/<env>/<component>-db.yaml`, then close it without
-  merging.
-
-## Platform Entity Provider (Milestone 4)
-
-Milestone 4 (see `BACKSTAGE_PART4.md` in `platform-architecture`) closes the
-loop the other direction from Milestone 3: once a `Database` CR actually
-exists on the cluster, it shows up on its owning Component's Catalog page
-under **Depends on resources**, with no one editing that Component's
-`catalog-info.yaml` by hand.
-
-There are deliberately **two independent flows** — one writes, one reads,
-and neither depends on the other working:
-
-```
-COMMAND / WRITE PATH (Milestone 3, unchanged)
-
-  Developer → Backstage (+ Add Database) → GitHub PR → merge
-      → Argo CD → Database CR → Crossplane → RDS instance
-
-DISCOVERY / READ PATH (this milestone, new)
-
-  Database CR (spec.componentRef) → PlatformEntityProvider
-      → Backstage Catalog → Component --dependsOn--> Resource
-```
-
-- **`spec.componentRef` is the authoritative relationship** — the same rule
-  `PLATFORM_API_ARCHITECTURE.md` states for every platform CR. The provider
-  never reads or writes `dependsOn` into any repository's `catalog-info.yaml`.
-- **Backstage is a read-only projection of platform state, never the source
-  of truth.** The provider only ever calls the Kubernetes API's `get`/`list`/
-  `watch` verbs (RBAC-enforced — see `chart/templates/clusterrole.yaml`) and
-  never creates/updates/patches/deletes a `Database` or `Component` CR.
-  Removing Backstage entirely would not affect provisioning.
-- **Provider**: `packages/backend/src/modules/platformEntityProvider/`
-  (`PlatformEntityProvider.ts` polls, `DatabaseEntityMapper.ts` is the pure
-  CR→entity transform, `module.ts` registers it with the catalog). Polls
-  every 60s across the namespaces in `platformCatalog.namespaces`; a `Ready`/
-  provisioning-status display is an explicit future milestone, not this one
-  — the entity only encodes the static `dependencyOf` relationship.
-- **Entity naming**: `<kubernetes-namespace>-<database-name>` (e.g.
-  `dev-checkout-db`), kept in the Backstage `default` namespace like every
-  other entity — not the raw CR name — specifically so the same logical
-  database name in two environments (`dev/checkout-db` vs `prod/checkout-db`)
-  never collides.
-- **Auth**: `@kubernetes/client-node`'s `loadFromDefault()` — in-cluster
-  ServiceAccount token when deployed (see the chart's `serviceaccount.yaml`/
-  `clusterrole.yaml`/`clusterrolebinding.yaml`, gated by
-  `platformCatalog.enabled`), local kubeconfig otherwise. Off by default
-  (`app-config.yaml`'s `platformCatalog.enabled: false`) so `yarn start`
-  needs no cluster.
-- **Failure handling**: a namespace's list call failing skips that entire
-  refresh cycle (previous entities kept) rather than publishing a partial
-  `full` mutation that would wrongly evict entities Backstage simply failed
-  to observe this cycle — see the comment in `PlatformEntityProvider.refresh()`.
-
-### Running locally
-
-Requires a reachable cluster with the `databases.database.taskapp.io` CRD
-installed (any context in `~/.kube/config` works — `loadFromDefault()`
-doesn't require in-cluster). Set:
-
-```sh
-export GITHUB_TOKEN=<as above>
-```
-
-then in `app-config.local.yaml` (gitignored):
-
-```yaml
-platformCatalog:
-  enabled: true
-  namespaces: [dev]
-```
-
-### Testing the flow
-
-- **Mapper unit tests** (no network, no cluster needed):
-  ```sh
-  yarn workspace backend test --testPathPatterns=platformEntityProvider
-  ```
-- **End-to-end**: run **Add Database** (Milestone 3) for an existing
-  component, merge the PR, wait for Argo CD to sync the `Database` CR, then
-  wait up to 60s and refresh the component's Catalog page — the database
-  appears under **Depends on resources** and in the Relations graph.
-
-## Create deployment template
-
-Step 1 of `DEPLOYMENTS.md` (in `platform-architecture`): deploy a version of
-a service to an environment from its Catalog page, instead of hand-writing
-its `Release`.
-
-```
-Catalog → <component> → Platform Actions → Create deployment
-    ↓
-form: Environment / Version / Bind dependencies (component pre-filled)
-    ↓
-Backstage renders the whole Release and opens a PR against
-entr0pian/application-repositories
-    ↓
-Merging the PR deploys it: release-operator writes the component's
-environment files, Argo CD syncs them
-```
-
-- **Template**: `templates/create-deployment/template.yaml`
-  (+ `skeleton/release.yaml`, renamed to `<component>-release.yaml`),
-  registered in both `app-config.yaml` and `app-config.production.yaml`.
-  Destination: `platform/environments/<env>/<component>-release.yaml`.
-  The file is always written in full, so a new environment is a new file
-  and an update's diff is only what changed.
-- **One PR per deployment**: branch
-  `backstage/deploy-<component>-<env>-<short sha>`. Two open PRs for the
-  same environment edit the same file, so after one merges the other
-  conflicts. That's the intended signal that it's out of date.
-- **Custom form fields**: `packages/app/src/modules/createDeployment/`, a
-  scaffolder frontend module (`FormFieldBlueprint`):
-  - `PlatformEnvironmentPicker`: the `platform.environments` list. The
-    deployed instance gets it from the chart's `environments` value (set in
-    `application-repositories` `values/backstage/management.yaml`), so a new
-    cluster is a values change, not an image rebuild. `app-config.yaml`
-    keeps a `[management]` default for local runs.
-  - `PlatformAutoDeployToggle`: whether the Release follows `main`
-    (`autoDeploy: {branch: main}`) instead of a pinned version;
-    see **Auto-deploy** below.
-  - `PlatformVersionPicker`: commits on the component repo's `main` whose
-    `ci.yaml` push run succeeded. CI only pushes an image, tagged with the
-    full commit SHA, from those runs. Each entry shows the short SHA, commit
-    message, author and age; the value is the full SHA, i.e. the Release's
-    `spec.version`. Served by `GET /api/platform/versions/:component`
-    (`packages/backend/src/modules/releaseVersions/DeployableVersion*`),
-    which takes the repo from the entity's `github.com/project-slug`
-    annotation and calls GitHub with the backend's `integrations.github`
-    token.
-  - `PlatformDependencyBindingsPicker`: the component's catalog Resources
-    (`dependencyOf` + `platform.taskapp.io/environment` = the chosen
-    environment), one dropdown per bindable type. It clears when the
-    environment changes, and with no dependencies it links to Add Database
-    for that environment. `bindings.ts`'s `BINDING_TYPES` maps a resource
-    type to its Release binding: today only `database` →
-    `bindings.database: { enabled: true, ref }`, since a Release binds at
-    most one database.
-
-### Auto-deploy
-
-A dev Release can follow `main` instead of a pinned version: release-operator
-polls the component's `ci.yaml` runs and, for every newer successful build,
-commits its SHA as `version:` to the Release file in `application-repositories`
-(no PR per deploy). Argo CD applies that file like any other change, and the
-deploy then runs the usual way. See `docs/AUTO_DEPLOY.md` in `release-operator`
-for the full design.
-
-- **Where**: `platform.autoDeployEnvironments` (default `[dev]`). Elsewhere
-  the toggle is greyed out and off. release-operator enforces the same list
-  with `--auto-deploy-environments`, so keep the two in step.
-- **Starts from git**: in dev the toggle starts as what's committed in
-  `platform/environments/dev/<component>-release.yaml`, read by
-  `GET /api/platform/committed-releases/:component/:environment`
-  (`CommittedRelease*`), never a default.
-- **On**: the Version picker is greyed out and cleared; the PR
-  (`Enable auto-deploy for <component> in dev`, branch
-  `backstage/deploy-<component>-dev-auto`) writes `autoDeploy: {branch: main}`
-  and no `version`; release-operator sets it to the newest build. **Off**: a
-  version is required again and the PR pins it.
-- **Onboard Service**: "Set up auto deployment to <env>" (`PlatformAutoDeploySetup`,
-  on by default; `<env>` is the first of `platform.autoDeployEnvironments`)
-  adds that same Release file (auto-deploy on, no version, no bindings) to the
-  onboarding PR.
-- **Deployments card**: an auto-deploy environment shows an **Auto-deploy**
-  badge and no **Rollback** button: the next build on `main` would deploy
-  straight over it. Revert on `main`, or turn Auto-deploy off and pin a
-  version. Its version is `spec.version`, as for any Release (empty until the
-  first build).
-
-### Testing the flow
-
-- **Template rendering**:
-  `node --test templates/create-deployment/render.test.mjs` and
-  `node --test templates/onboard-service/render.test.mjs`
-- **Unit tests**:
-  `yarn backstage-cli repo test packages/app/src/modules/createDeployment packages/app/src/modules/platformActions packages/backend/src/modules/releaseVersions`
-- **End-to-end** (deployed instance): open a service's Catalog page and
-  click **Create deployment**. Pick `management`, a version and (if it has
-  one) its database, then submit. Confirm the PR on
-  `entr0pian/application-repositories` contains the expected
-  `platform/environments/management/<component>-release.yaml`.
