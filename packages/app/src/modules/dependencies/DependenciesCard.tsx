@@ -29,6 +29,24 @@ const useStyles = makeStyles(theme => ({
     transition: 'background-color 150ms ease, transform 200ms cubic-bezier(.34,1.56,.64,1)',
     '&:hover': { transform: 'translateX(4px)' },
     '&:hover $chevron': { transform: 'translateX(3px)', color: theme.palette.primary.main },
+    // Phones: environment and name on top, the statuses wrapping underneath,
+    // the chevron on the right; the column headers are hidden.
+    [theme.breakpoints.down('xs')]: {
+      gridTemplateColumns: 'auto minmax(0, 1fr) 24px',
+      rowGap: theme.spacing(1),
+    },
+  },
+  // The status cells: grid cells of the row on wider screens, one wrapping
+  // line on phones.
+  statuses: {
+    display: 'contents',
+    [theme.breakpoints.down('xs')]: {
+      display: 'flex',
+      flexWrap: 'wrap',
+      gap: theme.spacing(2),
+      gridColumn: '1 / 3',
+      gridRow: 2,
+    },
   },
   header: {
     display: 'grid',
@@ -36,10 +54,12 @@ const useStyles = makeStyles(theme => ({
     gap: theme.spacing(2),
     padding: theme.spacing(0, 1, 0.5),
     color: theme.palette.text.secondary,
+    [theme.breakpoints.down('xs')]: { display: 'none' },
   },
   chevron: {
     color: theme.palette.text.secondary,
     transition: 'transform 200ms ease, color 200ms ease',
+    [theme.breakpoints.down('xs')]: { gridColumn: 3, gridRow: '1 / span 2' },
   },
   name: {
     minWidth: 0,
@@ -83,7 +103,7 @@ const RowShell = ({
           </Typography>
         )}
       </Box>
-      {children}
+      <Box className={classes.statuses}>{children}</Box>
       <ChevronRightIcon className={classes.chevron} fontSize="small" />
     </ListItem>
   );
