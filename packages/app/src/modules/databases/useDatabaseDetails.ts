@@ -45,6 +45,15 @@ export type DatabaseDetailsState =
   | { status: 'error'; error: Error }
   | { status: 'done'; details: DatabaseDetails };
 
+// Polled, so a database coming up (or a Release binding it) shows without
+// a reload: often while it isn't Ready yet, rarely once it is. The request
+// reads only the management cluster's Kubernetes API, never GitHub.
+const NOT_READY_MS = 10_000;
+const READY_MS = 60_000;
+
+export const nextPollMs = (details: DatabaseDetails | null) =>
+  details?.ready === true ? READY_MS : NOT_READY_MS;
+
 export function useDatabaseDetails(namespace: string, name: string): DatabaseDetailsState {
   const discoveryApi = useApi(discoveryApiRef);
   const fetchApi = useApi(fetchApiRef);
@@ -52,24 +61,37 @@ export function useDatabaseDetails(namespace: string, name: string): DatabaseDet
 
   useEffect(() => {
     let cancelled = false;
-    (async () => {
-      setState({ status: 'loading' });
-      try {
-        const baseUrl = await discoveryApi.getBaseUrl('platform');
-        const res = await fetchApi.fetch(
-          `${baseUrl}/databases/${encodeURIComponent(namespace)}/${encodeURIComponent(name)}`,
-        );
-        if (!res.ok) {
-          throw new Error(`Database details request failed: ${res.status} ${res.statusText}`);
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let last: DatabaseDetails | null = null;
+    setState({ status: 'loading' });
+
+    const load = async () => {
+      // A hidden tab skips the request and checks again later.
+      if (typeof document === 'undefined' || !document.hidden) {
+        try {
+          const baseUrl = await discoveryApi.getBaseUrl('platform');
+          const res = await fetchApi.fetch(
+            `${baseUrl}/databases/${encodeURIComponent(namespace)}/${encodeURIComponent(name)}`,
+          );
+          if (!res.ok) {
+            throw new Error(`Database details request failed: ${res.status} ${res.statusText}`);
+          }
+          last = await res.json();
+          if (!cancelled) setState({ status: 'done', details: last! });
+        } catch (error) {
+          // A failed refresh keeps the last answer on screen; only a first
+          // load that fails shows the error.
+          if (!cancelled && !last) setState({ status: 'error', error: error as Error });
         }
-        const details: DatabaseDetails = await res.json();
-        if (!cancelled) setState({ status: 'done', details });
-      } catch (error) {
-        if (!cancelled) setState({ status: 'error', error: error as Error });
       }
-    })();
+      if (!cancelled) {
+        timer = setTimeout(load, nextPollMs(last));
+      }
+    };
+    load();
     return () => {
       cancelled = true;
+      if (timer) clearTimeout(timer);
     };
   }, [discoveryApi, fetchApi, namespace, name]);
 
