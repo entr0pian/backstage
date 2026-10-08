@@ -19,8 +19,9 @@ import {
 export const PLATFORM_LABELS = {
   component: 'platform.taskapp.io/component',
   environment: 'platform.taskapp.io/environment',
-  // service (taskapp-catalog), component / database / release
-  // (taskapp-platform — the CR kind it delivers)
+  // service (taskapp-catalog), component / database / release /
+  // databaseschema (taskapp-platform — the CR kind it delivers), schema
+  // (taskapp-schemas — a service's migrations in one environment)
   type: 'platform.taskapp.io/type',
   // What the Application delivers: the service (taskapp-catalog) or the
   // CR's own name (taskapp-platform)

@@ -1,5 +1,4 @@
 import Box from '@material-ui/core/Box';
-import Button from '@material-ui/core/Button';
 import Grid from '@material-ui/core/Grid';
 import Typography from '@material-ui/core/Typography';
 import {
@@ -21,6 +20,7 @@ import { usePermission } from '@backstage/plugin-permission-react';
 import { taskCreatePermission } from '@backstage/plugin-scaffolder-common/alpha';
 import { useDatabaseDetails, type DatabaseDetails } from './useDatabaseDetails';
 import { argoApplicationUrl, useArgoApplication, useArgocdUiUrl } from '../platformUi/argocd';
+import { OpenInArgoCdButton } from '../platformUi';
 import { useSchemaStatus } from '../deployments/useSchemaStatus';
 import { availabilityFact, bindingFact, schemaFact, type HealthFact } from '../dependencies/databaseHealth';
 import { HealthFactStatus } from '../dependencies/DatabaseHealth';
@@ -126,17 +126,7 @@ export const DatabaseCard = () => {
           }
           action={
             <Box pt={2} pr={2} display="flex" alignItems="center" style={{ gap: 16 }}>
-              {argoUrl && (
-                <Button
-                  size="small"
-                  color="primary"
-                  href={argoUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  Open in Argo CD
-                </Button>
-              )}
+              <OpenInArgoCdButton url={argoUrl} />
             </Box>
           }
         >

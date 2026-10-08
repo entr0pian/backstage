@@ -48,6 +48,7 @@ import { SchemaSection } from './SchemaSection';
 import {
   EnvironmentCard as PlatformEnvironmentCard,
   HealthStatus,
+  OpenInArgoCdButton,
   PlatformEmptyState,
   shortVersion,
   timeAgo,
@@ -460,19 +461,7 @@ const EnvironmentCard = ({
                 </span>
               </Tooltip>
             </Box>
-            {argoUrl && (
-              <Button
-                size="small"
-                color="primary"
-                variant="outlined"
-                href={argoUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                endIcon={<OpenInNewIcon fontSize="small" />}
-              >
-                Open in Argo CD
-              </Button>
-            )}
+            <OpenInArgoCdButton url={argoUrl} />
           </div>
         </>
       )}

@@ -11,6 +11,8 @@ import { InfoCard, LinkButton, Progress } from '@backstage/core-components';
 import type { SchemaStatus } from '../deployments/useSchemaStatus';
 import { HealthFactStatus } from '../dependencies/DatabaseHealth';
 import { applySchemaHref } from '../platformActions/applySchemaHref';
+import { OpenInArgoCdButton } from '../platformUi';
+import { argoApplicationUrl, useArgoApplication, useArgocdUiUrl } from '../platformUi/argocd';
 import { schemaChecks } from './schemaChecks';
 
 const useStyles = makeStyles(theme => ({
@@ -52,23 +54,32 @@ export const DatabaseSchemaCard = ({
 }) => {
   const classes = useStyles();
   const checks = schema ? schemaChecks(schema, database) : null;
+  // The Application delivering this environment's schema (taskapp-schemas),
+  // found by the same label contract as every other platform Application.
+  const argoUrl = argoApplicationUrl(
+    useArgocdUiUrl(),
+    useArgoApplication({ type: 'schema', component, environment }),
+  );
 
   return (
     <InfoCard
       title="Database schema"
       subheader="Migrations from the service's repository, released separately from its code"
       action={
-        canApply ? (
-          <Box pt={2} pr={2}>
-            <LinkButton
-              to={applySchemaHref(component, environment)}
-              color="primary"
-              variant="outlined"
-              size="small"
-              startIcon={<TableChartOutlinedIcon />}
-            >
-              Apply database schema
-            </LinkButton>
+        canApply || argoUrl ? (
+          <Box pt={2} pr={2} display="flex" alignItems="center" style={{ gap: 12 }}>
+            {canApply && (
+              <LinkButton
+                to={applySchemaHref(component, environment)}
+                color="primary"
+                variant="outlined"
+                size="small"
+                startIcon={<TableChartOutlinedIcon />}
+              >
+                Apply database schema
+              </LinkButton>
+            )}
+            <OpenInArgoCdButton url={argoUrl} />
           </Box>
         ) : undefined
       }
