@@ -139,6 +139,8 @@ describe('buildDatabaseSummary', () => {
       arn: 'arn:aws:rds:eu-west-1:123456789012:db:payments-db',
       consoleUrl:
         'https://eu-west-1.console.aws.amazon.com/rds/home?region=eu-west-1#database:id=payments-db;is-cluster=false',
+      monitoringUrl:
+        'https://eu-west-1.console.aws.amazon.com/rds/home?region=eu-west-1#database:id=payments-db;is-cluster=false;tab=monitoring',
     });
   });
 

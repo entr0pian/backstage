@@ -24,7 +24,13 @@ export interface DatabaseDetails {
     multiAz: boolean | null;
     encrypted: boolean | null;
   } | null;
-  endpoint?: { address: string | null; port: number | null; arn: string | null; consoleUrl: string | null } | null;
+  endpoint?: {
+    address: string | null;
+    port: number | null;
+    arn: string | null;
+    consoleUrl: string | null;
+    monitoringUrl: string | null;
+  } | null;
   connection: { name: string; type: string | null; provider: string | null; key: string | null; ready: boolean | null }[];
   boundBy: { release: string; namespace: string; environment: string; mountPath: string }[];
   resources: {

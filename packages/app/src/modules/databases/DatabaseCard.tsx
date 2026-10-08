@@ -6,47 +6,22 @@ import {
   Link,
   Progress,
   ResponseErrorPanel,
-  StatusError,
   StatusOK,
   StatusPending,
   StatusWarning,
   StructuredMetadataTable,
-  Table,
-  type TableColumn,
 } from '@backstage/core-components';
 import { useRouteRef } from '@backstage/core-plugin-api';
 import { entityRouteRef, useEntity } from '@backstage/plugin-catalog-react';
 import { usePermission } from '@backstage/plugin-permission-react';
 import { taskCreatePermission } from '@backstage/plugin-scaffolder-common/alpha';
-import { useDatabaseDetails, type DatabaseDetails } from './useDatabaseDetails';
+import { useDatabaseDetails } from './useDatabaseDetails';
 import { argoApplicationUrl, useArgoApplication, useArgocdUiUrl } from '../platformUi/argocd';
-import { OpenInArgoCdButton } from '../platformUi';
+import { ExternalLinkButton, OpenInArgoCdButton } from '../platformUi';
 import { useSchemaStatus } from '../deployments/useSchemaStatus';
 import { availabilityFact, bindingFact, schemaFact, type HealthFact } from '../dependencies/databaseHealth';
 import { HealthFactStatus } from '../dependencies/DatabaseHealth';
 import { DatabaseSchemaCard } from './DatabaseSchemaCard';
-
-type Resource = DatabaseDetails['resources'][number];
-
-const ResourceState = ({ r }: { r: Resource }) => {
-  if (r.ready === true) return <StatusOK>{r.source === 'inferred' ? 'Ready (inferred)' : 'Ready'}</StatusOK>;
-  if (r.ready === false) return <StatusError>{r.reason ?? 'Not ready'}</StatusError>;
-  return <StatusPending>Unknown</StatusPending>;
-};
-
-const resourceColumns: TableColumn<Resource>[] = [
-  { title: 'Kind', field: 'kind' },
-  { title: 'Name', field: 'name' },
-  { title: 'State', render: r => <ResourceState r={r} /> },
-  {
-    title: 'Notes',
-    render: r => (
-      <Typography variant="body2" color="textSecondary">
-        {r.note ?? r.message ?? ''}
-      </Typography>
-    ),
-  },
-];
 
 const yesNo = (v: boolean | null) => {
   if (v === null) return '—';
@@ -54,9 +29,10 @@ const yesNo = (v: boolean | null) => {
 };
 
 // The platform view of a Database (BACKSTAGE_PART9.md Part B): its status,
-// how services get its credentials (the binding chain), and what Crossplane
-// provisioned for it. Data comes pre-joined and redacted from
-// /api/platform/databases/:namespace/:name.
+// how services get its credentials (the binding chain) and its schema. What
+// Crossplane provisioned is one click away in Argo CD, and its CloudWatch
+// metrics in the RDS console (owners). Data comes pre-joined and redacted
+// from /api/platform/databases/:namespace/:name.
 export const DatabaseCard = () => {
   const { entity } = useEntity();
   const entityRoute = useRouteRef(entityRouteRef);
@@ -125,7 +101,9 @@ export const DatabaseCard = () => {
             </>
           }
           action={
-            <Box pt={2} pr={2} display="flex" alignItems="center" style={{ gap: 16 }}>
+            <Box pt={2} pr={2} display="flex" alignItems="center" style={{ gap: 12 }}>
+              {/* CloudWatch metrics in the RDS console: owners only, like the rest of the endpoint. */}
+              <ExternalLinkButton url={d.endpoint?.monitoringUrl}>View metrics</ExternalLinkButton>
               <OpenInArgoCdButton url={argoUrl} />
             </Box>
           }
@@ -213,14 +191,6 @@ export const DatabaseCard = () => {
           />
         </Grid>
       )}
-      <Grid item xs={12}>
-        <Table
-          title="Provisioned resources (Crossplane)"
-          options={{ search: false, paging: false, padding: 'dense' }}
-          columns={resourceColumns}
-          data={d.resources}
-        />
-      </Grid>
     </Grid>
   );
 };

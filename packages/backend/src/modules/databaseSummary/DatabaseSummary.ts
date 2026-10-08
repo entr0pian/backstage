@@ -99,7 +99,14 @@ export interface DatabaseSummary {
     encrypted: boolean | null;
   } | null;
   // owner only
-  endpoint?: { address: string | null; port: number | null; arn: string | null; consoleUrl: string | null } | null;
+  endpoint?: {
+    address: string | null;
+    port: number | null;
+    arn: string | null;
+    consoleUrl: string | null;
+    // The same console page, opened on its Monitoring tab (CloudWatch metrics).
+    monitoringUrl: string | null;
+  } | null;
   connection: {
     name: string;
     type: string | null;
@@ -149,9 +156,11 @@ function explainNotReady(
   return parts.join(' ');
 }
 
-function awsConsoleUrl(region: string | null, identifier: string | null): string | null {
+// The RDS console's page for one instance, optionally on a given tab
+// (e.g. monitoring).
+function awsConsoleUrl(region: string | null, identifier: string | null, tab?: string): string | null {
   if (!region || !identifier) return null;
-  return `https://${region}.console.aws.amazon.com/rds/home?region=${region}#database:id=${encodeURIComponent(identifier)};is-cluster=false`;
+  return `https://${region}.console.aws.amazon.com/rds/home?region=${region}#database:id=${encodeURIComponent(identifier)};is-cluster=false${tab ? `;tab=${tab}` : ''}`;
 }
 
 export function buildDatabaseSummary(
@@ -247,6 +256,7 @@ export function buildDatabaseSummary(
                 port: num(ap.port),
                 arn: str(ap.arn),
                 consoleUrl: awsConsoleUrl(region, str(ap.identifier) ?? str(fp.identifier)),
+                monitoringUrl: awsConsoleUrl(region, str(ap.identifier) ?? str(fp.identifier), 'monitoring'),
               }
             : null,
         }
