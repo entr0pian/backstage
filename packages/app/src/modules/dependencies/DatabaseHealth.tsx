@@ -50,7 +50,8 @@ const Fact = ({ fact, compact }: { fact: HealthFact; compact: boolean }) => {
 // A platform Database's availability, schema and binding in one
 // environment (see databaseHealth.ts). `compact` is the Overview card's
 // one-line form: labels only, details as tooltips. The full form (the
-// Dependencies tab) also shows the engine and size.
+// Dependencies tab) puts each detail next to its label, wrapping only when
+// the row is too narrow, and adds the engine and size underneath.
 export const DatabaseHealth = ({
   namespace,
   name,
@@ -86,22 +87,22 @@ export const DatabaseHealth = ({
     .filter(Boolean)
     .join(' · ');
 
-  return (
-    <Box
-      display="flex"
-      flexDirection={compact ? 'row' : 'column'}
-      flexWrap="wrap"
-      alignItems={compact ? 'center' : 'flex-start'}
-      style={{ gap: compact ? 12 : 2 }}
-    >
+  const row = (
+    <Box display="flex" flexWrap="wrap" alignItems="center" style={{ columnGap: compact ? 12 : 24, rowGap: 4 }}>
       {facts.map(fact => (
         <Fact key={fact.label} fact={fact} compact={compact} />
       ))}
-      {!compact && engine && (
-        <Typography variant="caption" color="textSecondary">
-          {engine}
-        </Typography>
-      )}
+    </Box>
+  );
+  if (compact || !engine) {
+    return row;
+  }
+  return (
+    <Box>
+      {row}
+      <Typography variant="caption" color="textSecondary">
+        {engine}
+      </Typography>
     </Box>
   );
 };
