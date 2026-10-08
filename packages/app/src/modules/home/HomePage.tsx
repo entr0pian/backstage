@@ -195,16 +195,16 @@ const QUICK_ACTIONS = [
     icon: <StorageOutlinedIcon />,
   },
   {
-    template: 'create-deployment',
-    title: 'Deploy a version',
-    text: 'Open the Release PR that Argo CD and release-operator roll out.',
-    icon: <RocketLaunchIcon />,
-  },
-  {
     template: 'apply-schema',
     title: 'Apply a database schema',
     text: "Ship a service's migrations to an environment's database, separately from its code.",
     icon: <TableChartOutlinedIcon />,
+  },
+  {
+    template: 'create-deployment',
+    title: 'Deploy a version',
+    text: 'Open the Release PR that Argo CD and release-operator roll out.',
+    icon: <RocketLaunchIcon />,
   },
 ];
 
