@@ -10,6 +10,9 @@ export type HealthTone = 'ok' | 'running' | 'pending' | 'warning' | 'error' | 'n
 
 export interface HealthFact {
   label: string;
+  // The label under a column that already names the fact (the Overview
+  // card's "Schema" column): "Up to date" rather than "Schema up to date".
+  short?: string;
   tone: HealthTone;
   // Longer explanation, shown on the Dependencies tab (and as a tooltip on
   // the Overview card).
@@ -56,12 +59,18 @@ export function schemaFact(schema: SchemaStatus | null, database: string, onlyDa
 
   if (!requested && !applied) {
     return latest
-      ? { label: 'Schema not applied', tone: 'warning', detail: `Schema ${short(latest.version)} is published but not applied here` }
-      : { label: 'No schema', tone: 'neutral', detail: 'The service has published no migrations yet' };
+      ? {
+          label: 'Schema not applied',
+          short: 'Not applied',
+          tone: 'warning',
+          detail: `Schema ${short(latest.version)} is published but not applied here`,
+        }
+      : { label: 'No schema', short: 'None', tone: 'neutral', detail: 'The service has published no migrations yet' };
   }
   if (applied?.phase === 'Failed') {
     return {
       label: 'Schema failed',
+      short: 'Failed',
       tone: 'error',
       detail: applied.commit ? `Applying ${short(applied.commit)} failed` : 'The last migration failed',
     };
@@ -69,21 +78,23 @@ export function schemaFact(schema: SchemaStatus | null, database: string, onlyDa
   // Asked for a version the database doesn't report as applied yet.
   if (requested && (!applied || applied.phase !== 'Applied' || applied.commit !== requested.version)) {
     if (requested.published === false) {
-      return { label: 'Schema waiting', tone: 'pending', detail: requested.reason ?? undefined };
+      return { label: 'Schema waiting', short: 'Waiting', tone: 'pending', detail: requested.reason ?? undefined };
     }
-    return { label: 'Schema applying', tone: 'running', detail: `Applying ${short(requested.version)}` };
+    return { label: 'Schema applying', short: 'Applying', tone: 'running', detail: `Applying ${short(requested.version)}` };
   }
   const commit = applied?.commit ?? null;
   const upTo = applied?.lastAppliedVersion ? `up to ${applied.lastAppliedVersion}` : 'applied';
   if (latest && commit && commit !== latest.version) {
     return {
       label: 'Schema behind latest',
+      short: 'Behind latest',
       tone: 'warning',
       detail: `${short(commit)} applied (${upTo}), ${short(latest.version)} is published`,
     };
   }
   return {
     label: latest ? 'Schema up to date' : 'Schema applied',
+    short: latest ? 'Up to date' : 'Applied',
     tone: 'ok',
     detail: commit ? `${short(commit)}, ${upTo}` : upTo,
   };

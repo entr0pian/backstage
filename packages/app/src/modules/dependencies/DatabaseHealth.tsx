@@ -23,9 +23,51 @@ const STATUS: Record<HealthTone, (props: { children?: ReactNode }) => JSX.Elemen
   neutral: StatusPending,
 };
 
-const Fact = ({ fact, compact }: { fact: HealthFact; compact: boolean }) => {
+export type DatabaseHealthState =
+  | { status: 'loading' }
+  | { status: 'error' }
+  | {
+      status: 'done';
+      availability: HealthFact;
+      // null: nothing to say about this database's schema (see schemaFact).
+      schema: HealthFact | null;
+      binding: HealthFact;
+      // e.g. "postgres 16.13 · small"
+      engine: string;
+    };
+
+// A platform Database's availability, schema and binding in one environment
+// (see databaseHealth.ts), live: both reads poll. Shared by the Overview
+// card's table and the Dependencies tab.
+export function useDatabaseHealth(
+  namespace: string,
+  name: string,
+  environment: string,
+  onlyDatabase: boolean,
+): DatabaseHealthState {
+  const { entity } = useEntity();
+  const state = useDatabaseDetails(namespace, name);
+  const schema = useSchemaStatus(entity.metadata.name, environment);
+  if (state.status !== 'done') {
+    return { status: state.status };
+  }
+  const d = state.details;
+  return {
+    status: 'done',
+    availability: availabilityFact(d),
+    schema: schemaFact(schema, name, onlyDatabase),
+    binding: bindingFact(d, environment),
+    engine: [d.engine && [d.engine.engine, d.engine.version].filter(Boolean).join(' '), d.spec.size]
+      .filter(Boolean)
+      .join(' · '),
+  };
+}
+
+// One fact. `compact` (a table cell) shows the label with its detail as a
+// tooltip; otherwise the detail follows the label.
+export const HealthFactStatus = ({ fact, compact = false }: { fact: HealthFact; compact?: boolean }) => {
   const Status = STATUS[fact.tone];
-  const status = <Status>{fact.label}</Status>;
+  const status = <Status>{compact ? fact.short ?? fact.label : fact.label}</Status>;
   if (compact) {
     return fact.detail ? (
       <Tooltip title={fact.detail}>
@@ -47,62 +89,45 @@ const Fact = ({ fact, compact }: { fact: HealthFact; compact: boolean }) => {
   );
 };
 
-// A platform Database's availability, schema and binding in one
-// environment (see databaseHealth.ts). `compact` is the Overview card's
-// one-line form: labels only, details as tooltips. The full form (the
-// Dependencies tab) puts each detail next to its label, wrapping only when
-// the row is too narrow, and adds the engine and size underneath.
+// The Dependencies tab's form: the three facts in a row, each with its
+// detail, wrapping only when the row is too narrow; engine and size
+// underneath.
 export const DatabaseHealth = ({
   namespace,
   name,
   environment,
   onlyDatabase,
-  compact = false,
 }: {
   namespace: string;
   name: string;
   environment: string;
   onlyDatabase: boolean;
-  compact?: boolean;
 }) => {
-  const { entity } = useEntity();
-  const state = useDatabaseDetails(namespace, name);
-  const schema = useSchemaStatus(entity.metadata.name, environment);
+  const health = useDatabaseHealth(namespace, name, environment, onlyDatabase);
 
-  if (state.status === 'loading') {
+  if (health.status === 'loading') {
     return (
       <Typography variant="caption" color="textSecondary">
         checking…
       </Typography>
     );
   }
-  if (state.status === 'error') {
+  if (health.status === 'error') {
     return <StatusPending>Status unavailable</StatusPending>;
   }
-  const d = state.details;
-  const facts = [availabilityFact(d), schemaFact(schema, name, onlyDatabase), bindingFact(d, environment)].filter(
-    (f): f is HealthFact => f !== null,
-  );
-  const engine = [d.engine && [d.engine.engine, d.engine.version].filter(Boolean).join(' '), d.spec.size]
-    .filter(Boolean)
-    .join(' · ');
-
-  const row = (
-    <Box display="flex" flexWrap="wrap" alignItems="center" style={{ columnGap: compact ? 12 : 24, rowGap: 4 }}>
-      {facts.map(fact => (
-        <Fact key={fact.label} fact={fact} compact={compact} />
-      ))}
-    </Box>
-  );
-  if (compact || !engine) {
-    return row;
-  }
+  const facts = [health.availability, health.schema, health.binding].filter((f): f is HealthFact => f !== null);
   return (
     <Box>
-      {row}
-      <Typography variant="caption" color="textSecondary">
-        {engine}
-      </Typography>
+      <Box display="flex" flexWrap="wrap" alignItems="center" style={{ columnGap: 24, rowGap: 4 }}>
+        {facts.map(fact => (
+          <HealthFactStatus key={fact.label} fact={fact} />
+        ))}
+      </Box>
+      {health.engine && (
+        <Typography variant="caption" color="textSecondary">
+          {health.engine}
+        </Typography>
+      )}
     </Box>
   );
 };
