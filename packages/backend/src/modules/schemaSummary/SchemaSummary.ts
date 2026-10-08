@@ -17,8 +17,8 @@ export interface K8sCondition {
 // platform.taskapp.io/v1alpha1 DatabaseSchema, as read from management.
 export interface DatabaseSchemaResource {
   metadata?: { name?: string; namespace?: string; generation?: number };
-  spec?: { componentRef?: { name?: string }; version?: string };
-  status?: { observedGeneration?: number; conditions?: K8sCondition[] };
+  spec?: { componentRef?: { name?: string }; version?: string; databaseRef?: { name?: string } };
+  status?: { observedGeneration?: number; conditions?: K8sCondition[]; database?: { name?: string } };
 }
 
 // db.atlasgo.io/v1alpha1 AtlasMigration (Atlas Operator), as read from the
@@ -53,6 +53,9 @@ export interface SchemaSummary {
     name: string;
     namespace: string;
     version: string;
+    // The Database it applies to: what schema-operator resolved, else the
+    // spec's databaseRef; null while neither is known.
+    database: string | null;
     // Ready=True: schema-operator has published the pointer for it.
     published: boolean | null;
     reason: string | null;
@@ -111,6 +114,7 @@ export function buildSchemaSummary(
       name: databaseSchema.metadata.name,
       namespace: databaseSchema.metadata.namespace,
       version: databaseSchema.spec?.version ?? '',
+      database: databaseSchema.status?.database?.name ?? databaseSchema.spec?.databaseRef?.name ?? null,
       published: ready ? ready.status === 'True' : null,
       reason: ready?.reason ?? null,
       ...(owner ? { message: ready?.message ?? null } : {}),

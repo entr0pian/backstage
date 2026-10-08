@@ -71,12 +71,23 @@ describe('buildSchemaSummary', () => {
   const databaseSchema = {
     metadata: { name: 'orders-db', namespace: 'dev' },
     spec: { componentRef: { name: 'orders' }, version: SHA },
-    status: { conditions: [{ type: 'Ready', status: 'True', reason: 'Published', message: 'written' }] },
+    status: {
+      conditions: [{ type: 'Ready', status: 'True', reason: 'Published', message: 'written' }],
+      database: { name: 'orders-db' },
+    },
   };
 
   it('summarises what was asked for and what was applied', () => {
     expect(buildSchemaSummary(databaseSchema, migration(applied), { includeSensitive: true })).toEqual({
-      requested: { name: 'orders-db', namespace: 'dev', version: SHA, published: true, reason: 'Published', message: 'written' },
+      requested: {
+        name: 'orders-db',
+        namespace: 'dev',
+        version: SHA,
+        database: 'orders-db',
+        published: true,
+        reason: 'Published',
+        message: 'written',
+      },
       applied: {
         name: 'orders-schema',
         namespace: 'dev',
@@ -88,6 +99,13 @@ describe('buildSchemaSummary', () => {
         message: null,
       },
     });
+  });
+
+  it('names the database from the spec until schema-operator has resolved one', () => {
+    const pending = { ...databaseSchema, spec: { ...databaseSchema.spec, databaseRef: { name: 'orders-main' } }, status: {} };
+    expect(buildSchemaSummary(pending, null, { includeSensitive: false }).requested?.database).toBe('orders-main');
+    const unresolved = { ...databaseSchema, status: {} };
+    expect(buildSchemaSummary(unresolved, null, { includeSensitive: false }).requested?.database).toBeNull();
   });
 
   it('shows the failure reason to everyone and the SQL error to owners only', () => {

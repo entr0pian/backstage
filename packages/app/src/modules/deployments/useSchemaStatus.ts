@@ -11,6 +11,9 @@ export interface SchemaStatus {
     name: string;
     namespace: string;
     version: string;
+    // The Database it applies to; null until schema-operator resolves it
+    // (and no databaseRef names one).
+    database: string | null;
     published: boolean | null;
     reason: string | null;
     message?: string | null;
@@ -26,6 +29,9 @@ export interface SchemaStatus {
     message?: string | null;
   } | null;
   code: { version: string; newestMigration: string | null; ahead: boolean } | null;
+  // The newest schema version the component has published; null when none
+  // has been, or GitHub couldn't be asked.
+  latest: { version: string; createdAt: string | null } | null;
 }
 
 // Faster while something is changing, like the rollout card's polling.

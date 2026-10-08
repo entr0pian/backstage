@@ -1,4 +1,3 @@
-import { Fragment } from 'react';
 import Box from '@material-ui/core/Box';
 import List from '@material-ui/core/List';
 import ListItem from '@material-ui/core/ListItem';
@@ -8,6 +7,8 @@ import { InfoCard, Progress, ResponseErrorPanel } from '@backstage/core-componen
 import { EntityRefLink } from '@backstage/plugin-catalog-react';
 import { EnvironmentChip } from '../platformUi';
 import { useDependencies } from './useDependencies';
+import { DatabaseHealth } from './DatabaseHealth';
+import { platformDatabase } from './DependencyList';
 
 const useStyles = makeStyles(theme => ({
   row: {
@@ -19,12 +20,29 @@ const useStyles = makeStyles(theme => ({
   },
   names: {
     minWidth: 0,
+    display: 'grid',
+    gap: theme.spacing(0.75),
+  },
+  group: {
+    display: 'grid',
+    gridTemplateColumns: 'auto 1fr',
+    alignItems: 'baseline',
+    columnGap: theme.spacing(1),
+  },
+  dependency: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    columnGap: theme.spacing(2),
+    rowGap: theme.spacing(0.5),
+    gridColumn: 2,
   },
 }));
 
 // Overview summary, like the Deployments card: one row per environment that
-// has dependencies, naming them. Status and details live on the
-// Dependencies tab (the card's footer link).
+// has dependencies, naming them; each platform Database also says, in one
+// line, whether it's available, has the latest schema, and is bound.
+// Details live on the Dependencies tab (the card's footer link).
 export const DependenciesCard = () => {
   const classes = useStyles();
   const state = useDependencies();
@@ -64,22 +82,29 @@ export const DependenciesCard = () => {
                 <Typography variant="body2">All environments</Typography>
               )}
             </Box>
-            <Typography variant="body2" className={classes.names} component="div">
-              {groups.map((group, gi) => (
-                <Fragment key={group.type}>
-                  {gi > 0 && ' · '}
-                  <Typography variant="caption" color="textSecondary">
-                    {group.label}:{' '}
-                  </Typography>
-                  {group.entities.map((dependency, i) => (
-                    <Fragment key={dependency.metadata.name}>
-                      {i > 0 && ', '}
-                      <EntityRefLink entityRef={dependency} hideIcon />
-                    </Fragment>
-                  ))}
-                </Fragment>
-              ))}
-            </Typography>
+            <Box className={classes.names}>
+              {groups.map(group => {
+                const databaseCount = group.entities.filter(platformDatabase).length;
+                return (
+                  <Box key={group.type} className={classes.group}>
+                    <Typography variant="caption" color="textSecondary">
+                      {group.label}:
+                    </Typography>
+                    {group.entities.map(dependency => {
+                      const database = platformDatabase(dependency);
+                      return (
+                        <Box key={dependency.metadata.name} className={classes.dependency}>
+                          <Typography variant="body2" component="span">
+                            <EntityRefLink entityRef={dependency} hideIcon />
+                          </Typography>
+                          {database && <DatabaseHealth {...database} onlyDatabase={databaseCount === 1} compact />}
+                        </Box>
+                      );
+                    })}
+                  </Box>
+                );
+              })}
+            </Box>
           </ListItem>
         ))}
       </List>

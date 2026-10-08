@@ -19,6 +19,7 @@ import { isValidScaffoldName } from '../scaffoldVersions/ScaffoldVersionMapper';
 import type { SchemaReader } from '../schemaSummary/SchemaReader';
 import type { SchemaRepositoryReader } from '../schemaSummary/SchemaRepositoryReader';
 import { buildSchemaSummary, codeSchemaCheck, type CodeSchemaCheck } from '../schemaSummary/SchemaSummary';
+import { LatestSchemaVersion } from '../schemaSummary/LatestSchemaVersion';
 
 const COMMIT_SHA = /^[0-9a-f]{40}$/;
 
@@ -54,6 +55,7 @@ export function createRouter(options: {
     permissions,
   } = options;
   const router = Router();
+  const latestSchemas = new LatestSchemaVersion();
 
   // Owner-only detail is decided per request, server-side, by whether the
   // caller may read Kubernetes resources (owner only, modules/permissionPolicy).
@@ -165,10 +167,12 @@ export function createRouter(options: {
   });
 
   // GET /api/platform/schemas/:component/:environment[?committed=1] ->
-  // { component, environment, requested, applied, code[, committedVersion] }:
+  // { component, environment, requested, applied, code, latest[, committedVersion] }:
   // the DatabaseSchema on management, the AtlasMigration on the workload
-  // cluster (whether it was applied), and whether the code the Release
-  // deploys expects a migration the database doesn't have yet. With
+  // cluster (whether it was applied), whether the code the Release
+  // deploys expects a migration the database doesn't have yet, and the
+  // newest schema version the component has published (cached, see
+  // LatestSchemaVersion), so callers can tell whether it's the one applied. With
   // committed=1 (the Apply database schema form), also the DatabaseSchema
   // version committed in git; the polling deployment card leaves it out.
   // Atlas's condition messages (the failing SQL and database error) are
@@ -181,10 +185,14 @@ export function createRouter(options: {
     }
     const includeSensitive = await mayReadSensitive(req);
     const credentials = await httpAuth.credentials(req);
-    const [committedVersion, objects, releases] = await Promise.all([
+    const [committedVersion, objects, releases, latest] = await Promise.all([
       req.query.committed ? schemaRepos.committedVersion(component, environment) : Promise.resolve(undefined),
       schemas.read(component, environment),
       reader.listAll(),
+      latestSchemas.get(component, async () => {
+        const result = await schemaVersions.listForComponent(component, credentials);
+        return result.status === 'ok' ? result.versions : null;
+      }),
     ]);
     const summary = buildSchemaSummary(objects.databaseSchema, objects.atlasMigration, { includeSensitive });
 
@@ -210,6 +218,7 @@ export function createRouter(options: {
       ...(committedVersion !== undefined ? { committedVersion } : {}),
       ...summary,
       code,
+      latest,
     });
   });
 

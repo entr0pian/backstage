@@ -5,12 +5,24 @@ import Typography from '@material-ui/core/Typography';
 import { makeStyles } from '@material-ui/core/styles';
 import StorageIcon from '@material-ui/icons/Storage';
 import CategoryIcon from '@material-ui/icons/Category';
-import { StatusError, StatusOK, StatusPending } from '@backstage/core-components';
 import type { Entity } from '@backstage/catalog-model';
 import { EntityRefLink } from '@backstage/plugin-catalog-react';
-import { useDatabaseDetails } from '../databases/useDatabaseDetails';
 import { displayFont } from '../theme/themes';
 import type { DependencyGroup } from './groupByType';
+import { DatabaseHealth } from './DatabaseHealth';
+import { ENVIRONMENT_ANNOTATION } from './groupByEnvironment';
+
+// A platform Database the portal can show live status for: one the
+// platform provisioned, so it knows its namespace, name and environment.
+export const platformDatabase = (dependency: Entity) => {
+  const annotations = dependency.metadata.annotations ?? {};
+  const namespace = annotations['platform.taskapp.io/kubernetes-namespace'];
+  const name = annotations['platform.taskapp.io/database-name'];
+  const environment = annotations[ENVIRONMENT_ANNOTATION];
+  return dependency.spec?.type === 'database' && namespace && name && environment
+    ? { namespace, name, environment }
+    : null;
+};
 
 const useStyles = makeStyles(theme => ({
   groupLabel: {
@@ -47,47 +59,9 @@ const useStyles = makeStyles(theme => ({
   },
 }));
 
-// Live status line for a platform Database, from the same guest-safe route
-// the Database page uses (BACKSTAGE_PART9.md Part B).
-const DatabaseStatus = ({ namespace, name }: { namespace: string; name: string }) => {
-  const state = useDatabaseDetails(namespace, name);
-  if (state.status === 'loading') {
-    return (
-      <Typography variant="caption" color="textSecondary">
-        checking…
-      </Typography>
-    );
-  }
-  if (state.status === 'error') {
-    return <StatusPending>Status unavailable</StatusPending>;
-  }
-  const d = state.details;
-  const facts = [
-    d.engine && [d.engine.engine, d.engine.version].filter(Boolean).join(' '),
-    d.spec.size,
-  ]
-    .filter(Boolean)
-    .join(' · ');
-  return (
-    <Box display="flex" alignItems="center" style={{ gap: 12 }}>
-      {d.ready === true && <StatusOK>Ready</StatusOK>}
-      {d.ready === false && <StatusError>Not ready</StatusError>}
-      {d.ready === null && <StatusPending>Unknown</StatusPending>}
-      {facts && (
-        <Typography variant="caption" color="textSecondary">
-          {facts}
-        </Typography>
-      )}
-    </Box>
-  );
-};
-
-const DependencyRow = ({ dependency }: { dependency: Entity }) => {
+const DependencyRow = ({ dependency, onlyDatabase }: { dependency: Entity; onlyDatabase: boolean }) => {
   const classes = useStyles();
-  const annotations = dependency.metadata.annotations ?? {};
-  const k8sNamespace = annotations['platform.taskapp.io/kubernetes-namespace'];
-  const dbName = annotations['platform.taskapp.io/database-name'];
-  const isPlatformDatabase = dependency.spec?.type === 'database' && k8sNamespace && dbName;
+  const database = platformDatabase(dependency);
   const Icon = dependency.spec?.type === 'database' ? StorageIcon : CategoryIcon;
 
   return (
@@ -97,8 +71,8 @@ const DependencyRow = ({ dependency }: { dependency: Entity }) => {
         <Typography variant="body1" className={classes.name} component="div">
           <EntityRefLink entityRef={dependency} hideIcon />
         </Typography>
-        {isPlatformDatabase ? (
-          <DatabaseStatus namespace={k8sNamespace} name={dbName} />
+        {database ? (
+          <DatabaseHealth {...database} onlyDatabase={onlyDatabase} />
         ) : (
           dependency.metadata.description && (
             <Typography variant="caption" color="textSecondary">
@@ -112,9 +86,11 @@ const DependencyRow = ({ dependency }: { dependency: Entity }) => {
 };
 
 // One environment's dependencies, grouped by type — each row links to its
-// own page and, for platform Databases, shows live status.
+// own page and, for platform Databases, shows whether it's available, has
+// the latest schema, and is bound.
 export const DependencyList = ({ groups }: { groups: DependencyGroup[] }) => {
   const classes = useStyles();
+  const databaseCount = groups.flatMap(g => g.entities).filter(platformDatabase).length;
   return (
     <>
       {groups.map(group => (
@@ -127,6 +103,7 @@ export const DependencyList = ({ groups }: { groups: DependencyGroup[] }) => {
               <DependencyRow
                 key={`${dependency.kind}:${dependency.metadata.namespace}/${dependency.metadata.name}`}
                 dependency={dependency}
+                onlyDatabase={databaseCount === 1}
               />
             ))}
           </List>

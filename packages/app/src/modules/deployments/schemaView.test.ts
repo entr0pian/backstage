@@ -5,7 +5,7 @@ const A = '3f9c2e1a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e';
 const B = '4a0d3f2b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f';
 
 const status = (over: Partial<SchemaStatus>): SchemaStatus => ({
-  requested: { name: 'orders', namespace: 'dev', version: A, published: true, reason: 'Published' },
+  requested: { name: 'orders', namespace: 'dev', version: A, database: 'orders-db', published: true, reason: 'Published' },
   applied: {
     name: 'orders-schema',
     namespace: 'dev',
@@ -16,6 +16,7 @@ const status = (over: Partial<SchemaStatus>): SchemaStatus => ({
     reason: 'Applied',
   },
   code: { version: B, newestMigration: '20261009093000', ahead: false },
+  latest: null,
   ...over,
 });
 
@@ -47,7 +48,7 @@ describe('schemaView', () => {
 
   it('explains why a requested version is waiting', () => {
     const v = schemaView(
-      status({ requested: { name: 'orders', namespace: 'dev', version: B, published: false, reason: 'ArtifactNotFound' } }),
+      status({ requested: { name: 'orders', namespace: 'dev', version: B, database: 'orders-db', published: false, reason: 'ArtifactNotFound' } }),
     );
     expect(v).toMatchObject({ tone: 'pending', status: 'Waiting', detail: '4a0d3f2 requested' });
     expect(v?.reason).toContain('schema package');
