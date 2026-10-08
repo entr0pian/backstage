@@ -18,8 +18,9 @@ export interface SchemaView {
 
 const short = (sha: string | null | undefined) => (sha ? sha.slice(0, 7) : null);
 
-// Why a DatabaseSchema isn't published yet, in words (schema-operator reasons).
-const WAITING: Record<string, string> = {
+// Why a DatabaseSchema isn't published yet, in words (schema-operator
+// reasons). Also used by the Database page's schema checks.
+export const WAITING: Record<string, string> = {
   ArtifactNotFound: "waiting for this commit's schema package (its schema workflow may still be running, or failed)",
   DatabaseNotFound: 'waiting for a Database in this environment',
   ExportMissing: 'waiting for the Database to publish its connection details',

@@ -44,8 +44,9 @@ const isSettled = (s: SchemaStatus | null) =>
 
 // One environment's database schema, from GET /api/platform/schemas. null
 // until loaded, and when the request fails: the card then shows no schema
-// section rather than a wrong one.
-export function useSchemaStatus(component: string, environment: string): SchemaStatus | null {
+// section rather than a wrong one. A null component (not known yet) asks
+// for nothing.
+export function useSchemaStatus(component: string | null, environment: string): SchemaStatus | null {
   const discoveryApi = useApi(discoveryApiRef);
   const fetchApi = useApi(fetchApiRef);
   const [status, setStatus] = useState<SchemaStatus | null>(null);
@@ -54,6 +55,10 @@ export function useSchemaStatus(component: string, environment: string): SchemaS
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
     let last: SchemaStatus | null = null;
+    if (!component) {
+      setStatus(null);
+      return undefined;
+    }
 
     const load = async () => {
       try {

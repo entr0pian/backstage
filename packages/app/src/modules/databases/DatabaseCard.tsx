@@ -17,8 +17,14 @@ import {
 } from '@backstage/core-components';
 import { useRouteRef } from '@backstage/core-plugin-api';
 import { entityRouteRef, useEntity } from '@backstage/plugin-catalog-react';
+import { usePermission } from '@backstage/plugin-permission-react';
+import { taskCreatePermission } from '@backstage/plugin-scaffolder-common/alpha';
 import { useDatabaseDetails, type DatabaseDetails } from './useDatabaseDetails';
 import { argoApplicationUrl, useArgoApplication, useArgocdUiUrl } from '../platformUi/argocd';
+import { useSchemaStatus } from '../deployments/useSchemaStatus';
+import { availabilityFact, bindingFact, schemaFact, type HealthFact } from '../dependencies/databaseHealth';
+import { HealthFactStatus } from '../dependencies/DatabaseHealth';
+import { DatabaseSchemaCard } from './DatabaseSchemaCard';
 
 type Resource = DatabaseDetails['resources'][number];
 
@@ -42,12 +48,6 @@ const resourceColumns: TableColumn<Resource>[] = [
   },
 ];
 
-const HeaderStatus = ({ d }: { d: DatabaseDetails }) => {
-  if (d.ready === true) return <StatusOK>Ready</StatusOK>;
-  if (d.ready === false) return <StatusWarning>Not ready</StatusWarning>;
-  return <StatusPending>Unknown</StatusPending>;
-};
-
 const yesNo = (v: boolean | null) => {
   if (v === null) return '—';
   return v ? 'yes' : 'no';
@@ -63,7 +63,13 @@ export const DatabaseCard = () => {
   const annotations = entity.metadata.annotations ?? {};
   const namespace = annotations['platform.taskapp.io/kubernetes-namespace'] ?? '';
   const name = annotations['platform.taskapp.io/database-name'] ?? entity.metadata.title ?? '';
+  // The services' environment, which is the Database's namespace.
+  const environment = annotations['platform.taskapp.io/environment'] ?? namespace;
   const state = useDatabaseDetails(namespace, name);
+  const component = state.status === 'done' ? state.details.component : null;
+  const schema = useSchemaStatus(component, environment);
+  // Applying a schema runs a scaffolder template, which guests can't.
+  const { allowed: canApply } = usePermission({ permission: taskCreatePermission });
   // The Application delivering this Database CR, found by the same
   // platform.taskapp.io/* label contract as the Deployments tab.
   const argoApp = useArgoApplication(
@@ -74,6 +80,11 @@ export const DatabaseCard = () => {
   if (state.status === 'loading') return <Progress />;
   if (state.status === 'error') return <ResponseErrorPanel error={state.error} />;
   const d = state.details;
+
+  // Same three facts as the service's Dependencies views (databaseHealth.ts).
+  const facts = [availabilityFact(d), schemaFact(schema, d.name, true), bindingFact(d, environment)].filter(
+    (f): f is HealthFact => f !== null,
+  );
 
   const componentLink = d.component
     ? entityRoute({ namespace: 'default', kind: 'component', name: d.component })
@@ -115,7 +126,9 @@ export const DatabaseCard = () => {
           }
           action={
             <Box pt={2} pr={2} display="flex" alignItems="center" style={{ gap: 16 }}>
-              <HeaderStatus d={d} />
+              {facts.map(fact => (
+                <HealthFactStatus key={fact.label} fact={fact} compact />
+              ))}
               {argoUrl && (
                 <Button
                   size="small"
@@ -197,6 +210,17 @@ export const DatabaseCard = () => {
           </Grid>
         </InfoCard>
       </Grid>
+      {d.component && (
+        <Grid item xs={12}>
+          <DatabaseSchemaCard
+            component={d.component}
+            environment={environment}
+            database={d.name}
+            schema={schema}
+            canApply={canApply}
+          />
+        </Grid>
+      )}
       <Grid item xs={12}>
         <Table
           title="Provisioned resources (Crossplane)"
