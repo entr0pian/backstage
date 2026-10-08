@@ -16,7 +16,7 @@ import { dependencyTitle, useDependencyHref } from './useDependencyHref';
 
 // Same grid, row and hover as the Deployments card (DeploymentsCard.tsx),
 // so the two Overview tables read alike.
-const COLUMNS = 'minmax(110px, 1fr) minmax(120px, 1.4fr) minmax(90px, 1fr) minmax(90px, 1fr) minmax(90px, 1fr) 24px';
+const COLUMNS = 'minmax(64px, 0.7fr) minmax(120px, 1.4fr) repeat(3, minmax(max-content, 1fr)) 24px';
 
 const useStyles = makeStyles(theme => ({
   row: {

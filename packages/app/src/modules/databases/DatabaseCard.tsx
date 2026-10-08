@@ -126,9 +126,6 @@ export const DatabaseCard = () => {
           }
           action={
             <Box pt={2} pr={2} display="flex" alignItems="center" style={{ gap: 16 }}>
-              {facts.map(fact => (
-                <HealthFactStatus key={fact.label} fact={fact} compact />
-              ))}
               {argoUrl && (
                 <Button
                   size="small"
@@ -143,6 +140,11 @@ export const DatabaseCard = () => {
             </Box>
           }
         >
+          <Box display="flex" flexWrap="wrap" alignItems="center" mb={2} style={{ columnGap: 24, rowGap: 4 }}>
+            {facts.map(fact => (
+              <HealthFactStatus key={fact.label} fact={{ ...fact, short: undefined }} compact />
+            ))}
+          </Box>
           {d.problem && (
             <Box mb={2}>
               <StatusWarning>{d.problem}</StatusWarning>

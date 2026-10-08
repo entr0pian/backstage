@@ -31,7 +31,7 @@ const useStyles = makeStyles(theme => ({
     maxHeight: 160,
     overflow: 'auto',
   },
-  check: { width: '32%' },
+  check: { width: '45%' },
 }));
 
 // The Database page's schema card: every check a schema version passes on
